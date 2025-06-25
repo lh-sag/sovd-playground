@@ -1,6 +1,68 @@
-[package]
-name = "gh_diag"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+    "sovd",
+    "opensovd-client",
+    "opensovd-server",
+    "opensovd-cli",
+    "opensovd-tracing",
+]
+resolver = "2"
 
-[dependencies]
+[workspace.package]
+authors = ["Sanimir Agovic <sanimig.agovic@liebherr.com>"]
+description = "SOVD (ISO 17978) implementation"
+edition = "2024"
+homepage = "https://projects.eclipse.org/projects/automotive.opensovd"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/eclipse-opensovd/opensovd-core"
+version = "0.0.1"
+
+[workspace.dependencies]
+sovd = { version = "0.0.1", path = "sovd" }
+
+opensovd-client = { version = "0.0.1", path = "opensovd-client" }
+opensovd-server = { version = "0.0.1", path = "opensovd-server" }
+opensovd-tracing = { version = "0.0.1", path = "opensovd-tracing" }
+
+serde = { version = "1.0.219", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+clap = { version = "4.5.42", default-features = false, features = [
+    "cargo",
+    "help",
+    "std",
+    "usage",
+] }
+tokio = { version = "1.47.0", features = [
+    "net",
+    "rt",
+    "rt-multi-thread",
+    "signal",
+    "time",
+    "macros",
+], default-features = false }
+actix-web = { version = "4.9.0", default-features = false, features = [
+    "macros",
+] }
+tracing = { version = "0.1.41", default-features = false }
+tracing-subscriber = { version = "0.3.19", features = [
+    "alloc",
+    "fmt",
+], default-features = false }
+serde_json = { version = "1.0.133", default-features = false, features = [
+    "alloc",
+] }
+futures-core = { version = "0.3.31", default-features = false, features = [
+    "alloc",
+] }
+thiserror = { version = "1.0", default-features = false }
+http = { version = "1.1", default-features = false, features = ["std"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+panic = "abort"
+# strip = true

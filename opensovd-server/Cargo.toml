@@ -1,0 +1,39 @@
+[package]
+name = "opensovd-server"
+description = "Opensovd server"
+readme = "README.md"
+
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+version = { workspace = true }
+authors = { workspace = true }
+
+[features]
+default = ["tracing"]
+tracing = ["opensovd-tracing/tracing", "dep:tracing"]
+# Enable HTTP/2 support in the Actix Web server
+http2 = ["actix-web/http2"]
+# Enable the UI endpoint
+ui = ["dep:actix-files"]
+
+[dependencies]
+serde = { workspace = true }
+opensovd-tracing = { workspace = true }
+tracing = { workspace = true, optional = true }
+actix-web = { version = "4.9.0", default-features = false }
+actix-files = { version = "0.6.6", optional = true }
+futures-core = { workspace = true }
+
+sovd = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+http = { workspace = true }
+
+[dev-dependencies]
+tokio-util = { version = "0.7.15", features = ["full"] }
+actix-web = { version = "4.9.0", default-features = false, features = [
+    "macros",
+] }
