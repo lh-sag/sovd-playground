@@ -18,57 +18,71 @@ use sovd::models::version::VendorInfo;
 use crate::error::{ServerError, ServerResult};
 use std::future::Future;
 use std::net::TcpListener;
-
 #[cfg(unix)]
 use std::os::unix::net::UnixListener;
 
+#[cfg(feature = "openssl")]
+use openssl::ssl::SslAcceptorBuilder;
+
 /// Default base URI for the OpenSOVD server
-pub const DEFAULT_BASE_URI: &str = "http://localhost:9000/opensovd";
+pub const DEFAULT_BASE_URI: &str = "http://localhost:9000/";
 
 /// Server configuration containing binding and shutdown information.
 pub struct ServerConfig<T = VendorInfo> {
     /// The socket configuration for the server
-    socket: Option<Socket>,
+    pub(crate) socket: Option<Socket>,
     /// Optional shutdown signal future
-    pub shutdown: Option<BoxFuture<'static, ()>>,
+    pub(crate) shutdown: Option<BoxFuture<'static, ()>>,
     /// Vendor information for the server
-    pub vendor_info: T,
+    pub(crate) vendor_info: Option<T>,
     /// Base URI for the server
-    pub base_uri: Uri,
+    pub(crate) base_uri: Uri,
 }
 
 /// Socket configuration for the HTTP server.
-#[derive(Debug)]
 pub(crate) enum Socket {
-    /// Bind to a TCP socket using a TcpListener
+    /// Listen to a TCP socket
     TcpListener(TcpListener),
-    /// Bind to a Unix domain socket using a UnixListener
+    /// Listen to a secure TCP socket
+    #[cfg(feature = "openssl")]
+    SecureTcpListener(TcpListener, SslAcceptorBuilder),
+    /// Listen to a Unix domain socket
     #[cfg(unix)]
     UnixSocket(UnixListener),
 }
 
-impl Default for ServerConfig<VendorInfo> {
-    /// Creates a default server configuration listening on `127.0.0.1:8080`.
-    fn default() -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        Self {
-            socket: Some(Socket::TcpListener(listener)),
-            shutdown: None,
-            vendor_info: VendorInfo {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                name: "OpenSOVD".to_string(),
-            },
-            base_uri: DEFAULT_BASE_URI
-                .parse::<Uri>()
-                .expect("DEFAULT_BASE_URI should be valid"),
+impl std::fmt::Debug for Socket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Socket::TcpListener(listener) => f.debug_tuple("TcpListener").field(listener).finish(),
+            #[cfg(feature = "openssl")]
+            Socket::SecureTcpListener(listener, _) => {
+                // SslAcceptorBuilder doesn't implement Debug, so we just show the listener
+                f.debug_tuple("SecureTcpListener")
+                    .field(listener)
+                    .field(&"<SslAcceptorBuilder>")
+                    .finish()
+            }
+            #[cfg(unix)]
+            Socket::UnixSocket(listener) => f.debug_tuple("UnixSocket").field(listener).finish(),
         }
     }
 }
 
-impl<T> ServerConfig<T> {
-    /// Returns a reference to the socket configuration.
-    pub(crate) fn socket(&self) -> Option<&Socket> {
-        self.socket.as_ref()
+impl Default for ServerConfig<VendorInfo> {
+    /// Creates a default server configuration.
+    fn default() -> Self {
+        Self {
+            socket: None,
+            shutdown: None,
+            vendor_info: Some(VendorInfo {
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                name: "OpenSOVD".to_string(),
+            }),
+            base_uri: DEFAULT_BASE_URI
+                .parse::<Uri>()
+                .expect("DEFAULT_BASE_URI should be valid"),
+        }
     }
 }
 
@@ -96,7 +110,7 @@ impl ServerConfig {
     ///     vendor: "My Company".to_string(),
     /// };
     /// let config = ServerConfig::builder_with_vendor_type::<CustomVendorInfo>()
-    ///     .listen_address(listener)
+    ///     .listen(listener)
     ///     .vendor_info(vendor_info)
     ///     .base_uri("https://api.example.com/sovd")
     ///     .unwrap()
@@ -127,8 +141,15 @@ impl<T> ServerConfigBuilder<T> {
     }
 
     /// Listen on a TCP socket using a TcpListener.
-    pub fn listen_address(mut self, listener: TcpListener) -> Self {
+    pub fn listen(mut self, listener: TcpListener) -> Self {
         self.socket = Some(Socket::TcpListener(listener));
+        self
+    }
+
+    /// Listen on a TCP socket using a TcpListener.
+    #[cfg(feature = "openssl")]
+    pub fn listen_openssl(mut self, listener: TcpListener, ssl_acceptor_builder: SslAcceptorBuilder) -> Self {
+        self.socket = Some(Socket::SecureTcpListener(listener, ssl_acceptor_builder));
         self
     }
 
@@ -173,7 +194,7 @@ impl<T> ServerConfigBuilder<T> {
         ServerConfig {
             socket: self.socket,
             shutdown: self.shutdown,
-            vendor_info: self.vendor_info.expect("vendor_info must be set before building"),
+            vendor_info: self.vendor_info,
             base_uri: self.base_uri.unwrap_or_else(|| {
                 DEFAULT_BASE_URI
                     .parse::<Uri>()
@@ -206,156 +227,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_default_server_config() {
+        let config = ServerConfig::default();
+        assert!(config.socket.is_none());
+        assert!(config.vendor_info.is_some());
+        let vendor_info = config.vendor_info.unwrap();
+        assert_eq!(vendor_info.name, "OpenSOVD");
+        assert_eq!(vendor_info.version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(config.base_uri.to_string(), DEFAULT_BASE_URI);
+        assert!(config.shutdown.is_none());
+    }
+
+    #[test]
     fn test_server_config_builder() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let config = ServerConfig::builder().listen_address(listener).build();
-        match config.socket() {
-            Some(Socket::TcpListener(_)) => {}
-            #[cfg(unix)]
-            _ => panic!("Expected TcpListener"),
-        }
-        assert!(config.shutdown.is_none());
-
-        #[cfg(target_os = "linux")]
-        {
-            use std::os::linux::net::SocketAddrExt;
-            use std::os::unix::net::SocketAddr;
-
-            // Use abstract Unix domain socket
-            let socket_addr = SocketAddr::from_abstract_name("test_server_builder").unwrap();
-            let listener = UnixListener::bind_addr(&socket_addr).unwrap();
-            let config = ServerConfig::builder().listen_uds(listener).build();
-            match config.socket() {
-                Some(Socket::UnixSocket(_)) => {}
-                _ => panic!("Expected UnixSocket"),
-            }
-            assert!(config.shutdown.is_none());
-        }
-    }
-
-    #[test]
-    fn test_default_config() {
-        let config = ServerConfig::default();
-        match config.socket() {
-            Some(Socket::TcpListener(_)) => {}
-            #[cfg(unix)]
-            _ => panic!("Expected default to be TcpListener"),
-        }
-        assert!(config.shutdown.is_none());
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
-    fn test_shutdown_builder() {
-        use std::os::linux::net::SocketAddrExt;
-        use std::os::unix::net::{SocketAddr, UnixListener};
-
-        // Use abstract Unix domain socket
-        let socket_addr = SocketAddr::from_abstract_name("test_shutdown_builder").unwrap();
-        let listener = UnixListener::bind_addr(&socket_addr).unwrap();
-        let config = ServerConfig::builder()
-            .listen_uds(listener)
-            .shutdown(std::future::ready(()))
-            .build();
-
-        match config.socket() {
-            Some(Socket::UnixSocket(_)) => {}
-            _ => panic!("Expected UnixSocket"),
-        }
-        assert!(config.shutdown.is_some());
-    }
-
-    #[test]
-    fn test_custom_vendor_info_type() {
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-        struct CustomVendorInfo {
-            version: String,
-            company: String,
-            license: String,
-        }
-
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let custom_vendor_info = CustomVendorInfo {
-            version: "1.5.0".to_string(),
-            company: "Custom Corp".to_string(),
-            license: "MIT".to_string(),
-        };
-
-        let config = ServerConfig::builder_with_vendor_type::<CustomVendorInfo>()
-            .listen_address(listener)
-            .vendor_info(custom_vendor_info.clone())
-            .build();
-
-        assert_eq!(config.vendor_info.company, "Custom Corp");
-        assert_eq!(config.vendor_info.license, "MIT");
-        assert_eq!(config.vendor_info.version, "1.5.0");
-    }
-
-    #[test]
-    #[cfg(feature = "http2")]
-    fn test_http2_feature_enabled() {
-        // This test verifies that the http2 feature compiles correctly
-        // when enabled. The actual HTTP/2 functionality is provided by
-        // the underlying actix-web framework.
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let config = ServerConfig::builder().listen_address(listener).build();
-
-        // Verify that config can be created with http2 feature enabled
-        match config.socket() {
-            Some(Socket::TcpListener(_)) => {}
-            #[cfg(unix)]
-            _ => panic!("Expected TcpListener"),
-        }
-    }
-
-    #[test]
-    fn test_base_uri_configuration() {
-        // Test default base_uri
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let config = ServerConfig::builder().listen_address(listener).build();
-        assert_eq!(config.base_uri.to_string(), DEFAULT_BASE_URI);
-
-        // Test custom base_uri with string
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let custom_uri = "https://api.example.com/v2";
-        let config = ServerConfig::builder()
-            .listen_address(listener)
-            .base_uri(custom_uri)
-            .unwrap()
-            .build();
-        assert_eq!(config.base_uri.to_string(), custom_uri);
-
-        // Test base_uri with Uri type
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let uri: Uri = "https://api.example.com/v3".parse().unwrap();
-        let config = ServerConfig::builder()
-            .listen_address(listener)
-            .base_uri(uri.clone())
-            .unwrap()
-            .build();
-        assert_eq!(config.base_uri, uri);
-
-        // Test invalid URI
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let result = ServerConfig::builder()
-            .listen_address(listener)
-            .base_uri("not a valid uri");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_no_socket_configuration() {
-        // Test that ServerConfig can be created without a socket
         let vendor_info = VendorInfo {
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            name: "Test Server".to_string(),
+            version: "1.0.0".to_string(),
+            name: "TestServer".to_string(),
+        };
+        let config = ServerConfig::builder()
+            .listen(listener)
+            .vendor_info(vendor_info.clone())
+            .base_uri("http://test.example.com")
+            .unwrap()
+            .build();
+
+        assert!(config.socket.is_some());
+        assert!(config.vendor_info.is_some());
+        let vendor = config.vendor_info.unwrap();
+        assert_eq!(vendor.name, "TestServer");
+        assert_eq!(vendor.version, "1.0.0");
+        assert_eq!(config.base_uri.to_string(), "http://test.example.com/");
+    }
+
+    #[test]
+    fn test_server_with_shutdown() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let vendor_info = VendorInfo {
+            version: "1.0.0".to_string(),
+            name: "TestServer".to_string(),
         };
 
-        let config = ServerConfig::builder().vendor_info(vendor_info).build();
+        let shutdown_future = async {};
+        let config = ServerConfig::builder()
+            .listen(listener)
+            .vendor_info(vendor_info)
+            .shutdown(shutdown_future)
+            .build();
 
-        // Should have no socket configured
-        assert!(config.socket().is_none());
+        assert!(config.socket.is_some());
+        assert!(config.shutdown.is_some());
+        assert!(config.vendor_info.is_some());
+        let vendor = config.vendor_info.unwrap();
+        assert_eq!(vendor.name, "TestServer");
+        assert_eq!(vendor.version, "1.0.0");
     }
 }

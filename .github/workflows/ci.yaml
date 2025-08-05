@@ -22,12 +22,6 @@ jobs:
           - "release"
     runs-on: ${{ matrix.platform.os }}
     steps:
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          targets: ${{ matrix.platform.target }}
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
       - uses: actions/checkout@v4
       - name: Build
         uses: houseabsolute/actions-rust-cross@v1

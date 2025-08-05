@@ -24,6 +24,10 @@ pub enum ServerError {
     /// Invalid URI provided.
     #[error("Invalid URI: {0}")]
     InvalidUri(#[from] http::uri::InvalidUri),
+
+    /// Invalid URI provided.
+    #[error("Bad configuration: {0}")]
+    BadConfiguration(String),
 }
 
 impl From<Infallible> for ServerError {

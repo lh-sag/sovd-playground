@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OpenSOVD</title>
+
+        <!-- Bootstrap CSS -->
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+
+        <!-- Vue.js 3 -->
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+        <style>
+            html,
+            body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #app {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .topbar {
+                background-color: #343a40;
+                color: white;
+                padding: 0.5rem;
+            }
+
+            .content {
+                flex: 1;
+                background-color: #f8f9fa;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="app">
+            <!-- Topbar -->
+            <nav class="topbar">
+                <div
+                    class="container-fluid d-flex justify-content-between align-items-center"
+                >
+                    <div>{{ appName }}</div>
+                    <div v-if="versionInfo">
+                        Version: {{ versionInfo.version }} | Vendor: {{
+                        versionInfo.vendor }}
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content area -->
+            <div class="content">
+                <!-- Empty content area -->
+            </div>
+        </div>
+
+        <!-- Bootstrap JS Bundle -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+        <!-- Vue.js Application -->
+        <script>
+            const { createApp } = Vue;
+
+            createApp({
+                data() {
+                    return {
+                        appName: "OpenSOVD",
+                        versionInfo: null,
+                    };
+                },
+                mounted() {
+                    fetch("/opensovd/version-info", {
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                    })
+                        .then((response) => {
+                            if (response.ok) {
+                                return response.json();
+                            }
+                            throw new Error("Response not ok");
+                        })
+                        .then((data) => {
+                            if (data.info && data.info.length > 0) {
+                                const info = data.info[0];
+                                this.versionInfo = {
+                                    version: info.version,
+                                    vendor: info.vendor_info
+                                        ? info.vendor_info.name
+                                        : "Unknown",
+                                };
+                            }
+                        })
+                        .catch((error) => {
+                            console.error(
+                                "Failed to fetch version info:",
+                                error,
+                            );
+                        });
+                },
+            }).mount("#app");
+        </script>
+    </body>
+</html>

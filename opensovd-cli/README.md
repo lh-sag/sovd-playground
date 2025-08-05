@@ -6,14 +6,14 @@ CLI tools package for OpenSOVD providing command-line utilities for interacting 
 
 This crate provides command-line tools for the OpenSOVD (ISO 17978) implementation, including:
 
-- Gateway daemon for SOVD services
+- Diagnostic server for SOVD
 - CLI client for interacting with SOVD servers
 
 ## Binaries
 
 | Binary | Description |
 |--------|-------------|
-| `osovd-gateway` | OpenSOVD daemon/gateway server for handling SOVD service requests |
+| `osovd-gateway` | OpenSOVD server for handling SOVD service requests |
 | `osovd-cli` | OpenSOVD CLI client for interacting with SOVD services and topology management |
 
 ## Cargo Features

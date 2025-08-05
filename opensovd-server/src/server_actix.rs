@@ -12,21 +12,28 @@
 //
 
 #[cfg(feature = "ui")]
-use actix_files::Files;
+use crate::ui::configure_ui;
 use actix_web::{App, HttpServer, guard, web};
 
 use crate::error::{ServerError, ServerResult};
 use crate::server::{ServerConfig, Socket};
 use http::Uri;
 use opensovd_tracing::info;
+#[cfg(feature = "openssl")]
+use openssl::ssl::{SslAcceptor, SslMethod};
+#[cfg(feature = "json-schema")]
+use schemars::schema_for_value;
+
+use actix_web::middleware::Logger;
 use sovd::models::version::{VendorInfo, VersionInfo};
 use std::net::TcpListener;
+use std::os::unix::net::UnixListener;
 
 /// Shared state for the OpenSOVD HTTP Server.
 #[derive(Debug, Clone)]
 pub struct ServerState<T = VendorInfo> {
     /// The vendor information.
-    pub vendor_info: T,
+    pub vendor_info: Option<T>,
     /// The base URI for the server.
     pub base_uri: Uri,
 }
@@ -66,11 +73,6 @@ where
         );
     }
 
-    #[cfg(feature = "ui")]
-    fn configure_ui(cfg: &mut web::ServiceConfig) {
-        cfg.service(Files::new("/ui", "./assets").index_file("index.html"));
-    }
-
     /// Starts the HTTP server and binds to the configured address.
     ///
     /// This function will run until the shutdown future completes.
@@ -81,21 +83,51 @@ where
         let base_path = self.config.base_uri.path().to_string();
         let server_builder = HttpServer::new(move || {
             let app = App::new()
+                .wrap(Logger::new("%a %{User-Agent}i"))
                 .app_data(web::Data::new(state.clone()))
                 .configure(|cfg| Self::configure_app(cfg, &base_path));
             #[cfg(feature = "ui")]
-            let app = app.configure(Self::configure_ui);
+            let app = app.configure(configure_ui);
             app
         });
 
-        let server = match self.config.socket() {
-            Some(Socket::TcpListener(listener)) => server_builder.listen(listener.try_clone()?)?,
+        let server = match self.config.socket {
+            Some(Socket::TcpListener(ref listener)) => server_builder.listen(listener.try_clone()?)?,
+            #[cfg(feature = "openssl")]
+            Some(Socket::SecureTcpListener(ref listener, ssl)) => {
+                server_builder.listen_openssl(listener.try_clone()?, ssl)?
+            }
             #[cfg(unix)]
-            Some(Socket::UnixSocket(listener)) => server_builder.listen_uds(listener.try_clone()?)?,
+            Some(Socket::UnixSocket(ref listener)) => server_builder.listen_uds(listener.try_clone()?)?,
             None => {
-                // Default to binding on localhost with a random port
-                let listener = TcpListener::bind("127.0.0.1:0")?;
-                server_builder.listen(listener)?
+                let host = self.config.base_uri.host().unwrap_or("localhost");
+                let port = self.config.base_uri.port_u16().unwrap_or(9000);
+                match self.config.base_uri.scheme_str() {
+                    Some("http") => {
+                        let listener = TcpListener::bind(format!("{host}:{port}"))?;
+                        server_builder.listen(listener)?
+                    }
+                    #[cfg(feature = "openssl")]
+                    Some("https") => {
+                        let listener = TcpListener::bind(format!("{host}:{port}"))?;
+                        let builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
+                        server_builder.listen_openssl(listener, builder)?
+                    }
+                    #[cfg(unix)]
+                    Some("uds") => {
+                        let path = self.config.base_uri.path();
+                        let listener = UnixListener::bind(path)?;
+                        server_builder.listen_uds(listener)?
+                    }
+                    Some(schema) => {
+                        return Err(ServerError::BadConfiguration(format!(
+                            "Uri schema not supported: {schema}"
+                        )));
+                    }
+                    None => {
+                        return Err(ServerError::BadConfiguration(format!("Uri schema invalid")));
+                    }
+                }
             }
         };
 
@@ -104,7 +136,7 @@ where
         } else {
             server
         };
-        server.run().await.map_err(ServerError::Io)
+        server.workers(1).run().await.map_err(ServerError::Io)
     }
 }
 
@@ -115,9 +147,7 @@ async fn get_version_info<T>(state: web::Data<ServerState<T>>) -> impl actix_web
 where
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + Sync + 'static,
 {
-    info!("Handling GET /version-info request");
     const ISO_VERSION: &str = "1.1";
-    // Construct VersionInfo with the vendor info
     let version_info = VersionInfo {
         info: vec![sovd::models::version::Info {
             version: ISO_VERSION.to_string(),
@@ -125,25 +155,28 @@ where
             vendor_info: Some(state.vendor_info.clone()),
         }],
     };
-    web::Json(version_info)
+
+    let _ = schema_for_value!(version_info);
+    return web::Json(version_info);
+    //web::Json(serde_json::json!({"info":  version_info, "schema": schema_for_value!(version_info)}))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::server::DEFAULT_BASE_URI;
-
+    use actix_web::{App, test, web};
     use tokio::time::{Duration, timeout};
 
     #[actix_web::test]
     async fn test_server_timeout() {
         use std::net::TcpListener;
 
-        // Use TCP listener
+        let shutdown = async {};
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let config = ServerConfig::builder()
-            .listen_address(listener)
-            .shutdown(std::future::ready(()))
+            .listen(listener)
+            .shutdown(shutdown)
             .vendor_info(VendorInfo {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "Test Server".to_string(),
@@ -161,7 +194,6 @@ mod tests {
         use std::os::unix::net::{SocketAddr, UnixListener};
         use tokio::time::{Duration, timeout};
 
-        // Use abstract Unix domain socket
         let socket_addr = SocketAddr::from_abstract_name("test_opensovd_server").unwrap();
         let listener = UnixListener::bind_addr(&socket_addr).unwrap();
         let config = ServerConfig::builder()
@@ -179,12 +211,11 @@ mod tests {
 
     #[actix_web::test]
     async fn test_guard_positive() {
-        use actix_web::{App, test, web};
         let state = ServerState {
-            vendor_info: VendorInfo {
+            vendor_info: Some(VendorInfo {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "Test Server".to_string(),
-            },
+            }),
             base_uri: DEFAULT_BASE_URI
                 .parse::<Uri>()
                 .expect("DEFAULT_BASE_URI should be valid"),
@@ -208,10 +239,10 @@ mod tests {
     async fn test_guard_negative() {
         use actix_web::{App, test, web};
         let state = ServerState {
-            vendor_info: VendorInfo {
+            vendor_info: Some(VendorInfo {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "Test Server".to_string(),
-            },
+            }),
             base_uri: DEFAULT_BASE_URI
                 .parse::<Uri>()
                 .expect("DEFAULT_BASE_URI should be valid"),
@@ -236,10 +267,10 @@ mod tests {
     async fn test_guard_wrong_content_type() {
         use actix_web::{App, test, web};
         let state = ServerState {
-            vendor_info: VendorInfo {
+            vendor_info: Some(VendorInfo {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "Test Server".to_string(),
-            },
+            }),
             base_uri: DEFAULT_BASE_URI
                 .parse::<Uri>()
                 .expect("DEFAULT_BASE_URI should be valid"),
@@ -276,7 +307,7 @@ mod tests {
         };
 
         let state = ServerState {
-            vendor_info: custom_vendor,
+            vendor_info: Some(custom_vendor),
             base_uri: DEFAULT_BASE_URI
                 .parse::<Uri>()
                 .expect("DEFAULT_BASE_URI should be valid"),
@@ -303,7 +334,7 @@ mod tests {
 
         assert_eq!(response.info.len(), 1);
         assert_eq!(response.info[0].version, "1.1");
-        assert_eq!(response.info[0].base_uri, DEFAULT_BASE_URI);
+        assert_eq!(response.info[0].base_uri, format!("{}", DEFAULT_BASE_URI));
 
         let vendor = response.info[0].vendor_info.as_ref().unwrap();
         assert_eq!(vendor.build_date, "2025-01-01");
@@ -316,10 +347,10 @@ mod tests {
 
         // Test with custom base path
         let state = ServerState {
-            vendor_info: VendorInfo {
+            vendor_info: Some(VendorInfo {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "Test Server".to_string(),
-            },
+            }),
             base_uri: "/api/v2/opensovd".parse::<Uri>().expect("should be valid"),
         };
 
@@ -330,7 +361,6 @@ mod tests {
         )
         .await;
 
-        // Test that the endpoint is available at the custom path
         let req = test::TestRequest::get()
             .uri("/api/v2/opensovd/version-info")
             .insert_header(("content-type", "application/json"))
@@ -338,7 +368,6 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success(), "Should succeed with custom base path");
 
-        // Test that the old path doesn't work
         let req = test::TestRequest::get()
             .uri("/version-info")
             .insert_header(("content-type", "application/json"))
@@ -351,19 +380,15 @@ mod tests {
     async fn test_server_with_no_socket_config() {
         use tokio::time::{Duration, timeout};
 
-        // Test that server can start without socket configuration
         let vendor_info = VendorInfo {
             version: env!("CARGO_PKG_VERSION").to_string(),
             name: "Test Server".to_string(),
         };
-
         let config = ServerConfig::builder()
             .vendor_info(vendor_info)
             .shutdown(std::future::ready(()))
             .build();
-
-        // Verify no socket is configured
-        assert!(config.socket().is_none());
+        assert!(config.socket.is_none());
 
         let server = Server::new(config);
         let result = timeout(Duration::from_secs(1), server.start()).await;
@@ -371,5 +396,36 @@ mod tests {
             result.is_ok(),
             "Server should start successfully with no socket config and use default"
         );
+    }
+
+    #[cfg(unix)]
+    #[actix_web::test]
+    async fn test_server_shutdown_on_ctrl_c() {
+        use std::net::TcpListener;
+        use tokio::time::{Duration, sleep, timeout};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let shutdown_signal = async move {
+            tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl_c");
+        };
+        let config = ServerConfig::builder()
+            .listen(listener)
+            .vendor_info(VendorInfo {
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                name: "Test Server".to_string(),
+            })
+            .shutdown(shutdown_signal)
+            .build();
+        let server = Server::new(config);
+        let server_handle = tokio::spawn(async move { server.start().await });
+        sleep(Duration::from_millis(100)).await;
+        unsafe {
+            libc::kill(libc::getpid(), libc::SIGINT);
+        }
+        let result = timeout(Duration::from_secs(5), server_handle).await;
+        assert!(result.is_ok(), "Server should shut down within timeout");
+        let server_result = result.unwrap();
+        assert!(server_result.is_ok(), "Server task should complete successfully");
+        assert!(server_result.unwrap().is_ok(), "Server should shut down cleanly");
     }
 }

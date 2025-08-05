@@ -16,7 +16,7 @@ This crate provides server-side functionality for the OpenSOVD (ISO 17978) imple
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `tracing` | Yes | Enables tracing support via opensovd-tracing |
-| `http2` | No | Enables HTTP/2 support in the Actix Web server |
+| `ui` | No | Serves UI files from the filesystem |
 
 ## Usage
 
@@ -39,6 +39,13 @@ To enable HTTP/2 support:
 ```toml
 [dependencies]
 opensovd-server = { version = "0.0.1", features = ["http2"] }
+```
+
+To enable embedded UI (for production deployments):
+
+```toml
+[dependencies]
+opensovd-server = { version = "0.0.1", features = ["ui-embed"] }
 ```
 
 To enable both tracing and HTTP/2:
@@ -68,7 +75,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     let config = ServerConfig::builder()
-        .listen_address(listener)
+        .listen(listener)
         .shutdown(shutdown_signal)
         .build();
 
@@ -88,7 +95,7 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:8080")?;
 
     let config = ServerConfig::builder()
-        .listen_address(listener)
+        .listen(listener)
         .build();
 
     let server = Server::new(config);
@@ -119,7 +126,6 @@ async fn main() -> std::io::Result<()> {
 
 The server provides the following REST API endpoints:
 
-- `GET /version-info` - Returns SOVD version information
-- `GET /v1/version-info` - Versioned endpoint for SOVD version information
+- `GET {base_uri}/version-info` - Returns SOVD version information
 
 Both endpoints return JSON responses with the current SOVD version information.

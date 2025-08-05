@@ -20,6 +20,9 @@ mod error;
 mod server;
 mod server_actix;
 
+#[cfg(feature = "ui")]
+mod ui;
+
 // Re-export main types for convenience
 pub use error::{ServerError, ServerResult};
 pub use server::{ServerConfig, ServerConfigBuilder};
