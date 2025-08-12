@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
       - id: check-toml
@@ -16,8 +16,9 @@ repos:
     rev: v1.0
     hooks:
       - id: fmt
+        args: ['--all', '--']
       - id: clippy
-        args: ["--all-targets", "--all-features", "--verbose"]
+        args: ['--all-targets', '--all-features', '--', '-D', 'warnings']
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.45.0
     hooks:

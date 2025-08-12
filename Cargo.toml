@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "sovd",
+    "opensovd-models",
     "opensovd-client",
     "opensovd-server",
     "opensovd-cli",
@@ -19,7 +19,7 @@ repository = "https://github.com/eclipse-opensovd/opensovd-core"
 version = "0.0.1"
 
 [workspace.dependencies]
-sovd = { version = "0.0.1", path = "sovd" }
+opensovd-models = { version = "0.0.1", path = "opensovd-models" }
 
 opensovd-client = { version = "0.0.1", path = "opensovd-client" }
 opensovd-server = { version = "0.0.1", path = "opensovd-server" }

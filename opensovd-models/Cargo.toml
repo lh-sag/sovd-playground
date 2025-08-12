@@ -1,0 +1,17 @@
+[package]
+name = "opensovd-models"
+description = "SOVD (ISO 17978) models and types"
+readme = "README.md"
+edition = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+
+[features]
+default = ["jsonschema-schemars"]
+jsonschema = []
+jsonschema-schemars = ["schemars/derive", "jsonschema"]
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+schemars = { workspace = true, optional = true, features = ["std"] }

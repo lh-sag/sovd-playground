@@ -1,0 +1,23 @@
+doc:
+  - "**/*.md"
+  - "CONTRIBUTING*"
+  - "LICENSE"
+  - "NOTICE"
+
+ci:
+  - ".github/**"
+
+crate:opensovd-models:
+  - "opensovd-models/**"
+
+crate:opensovd-client:
+  - "opensovd-client/**"
+
+crate:opensovd-server:
+  - "opensovd-server/**"
+
+crate:opensovd-cli:
+  - "opensovd-cli/**"
+
+crate:opensovd-tracing:
+  - "opensovd-tracing/**"

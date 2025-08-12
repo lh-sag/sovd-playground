@@ -33,7 +33,7 @@ The following conventions are followed within this project.
 
 ## Legal considerations
 
-* Sign the Eclipse Contributor Agreement (ECA) electronically prior to contributing.
+* Sign the Eclipse Contributor Agreement ([ECA](https://www.eclipse.org/legal/eca/)) electronically prior to contributing.
 * Newly created files contain a proper license header
 
   ```rust

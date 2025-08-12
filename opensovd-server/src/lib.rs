@@ -17,13 +17,11 @@
 //! Currently supports Actix-web based server with REST API endpoints.
 
 mod error;
+mod routes;
 mod server;
 mod server_actix;
 
-#[cfg(feature = "ui")]
-mod ui;
-
 // Re-export main types for convenience
-pub use error::{ServerError, ServerResult};
+pub use error::{Error, Result};
 pub use server::{ServerConfig, ServerConfigBuilder};
-pub use server_actix::{Server, ServerState};
+pub use server_actix::Server;

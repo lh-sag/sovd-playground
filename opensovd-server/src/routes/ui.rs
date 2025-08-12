@@ -16,7 +16,6 @@
 use actix_web::web;
 
 /// Configures the UI endpoint based on the enabled features
-#[cfg(feature = "ui")]
-pub fn configure_ui(cfg: &mut web::ServiceConfig) {
+pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(actix_files::Files::new("/ui", "./assets").index_file("index.html"));
 }

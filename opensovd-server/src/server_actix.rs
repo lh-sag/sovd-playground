@@ -11,42 +11,35 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#[cfg(feature = "ui")]
-use crate::ui::configure_ui;
-use actix_web::{App, HttpServer, guard, web};
-
-use crate::error::{ServerError, ServerResult};
-use crate::server::{ServerConfig, Socket};
-use http::Uri;
-use opensovd_tracing::info;
-#[cfg(feature = "openssl")]
-use openssl::ssl::{SslAcceptor, SslMethod};
-#[cfg(feature = "json-schema")]
-use schemars::schema_for_value;
-
 use actix_web::middleware::Logger;
-use sovd::models::version::{VendorInfo, VersionInfo};
-use std::net::TcpListener;
-use std::os::unix::net::UnixListener;
+use actix_web::{App, HttpServer, guard, web};
+use opensovd_models::version::VendorInfo;
+use opensovd_tracing::info;
 
-/// Shared state for the OpenSOVD HTTP Server.
-#[derive(Debug, Clone)]
-pub struct ServerState<T = VendorInfo> {
-    /// The vendor information.
-    pub vendor_info: Option<T>,
-    /// The base URI for the server.
-    pub base_uri: Uri,
-}
+use crate::error::{Error, Result};
+use crate::routes;
+use crate::server::{Listener, ServerConfig};
 
 /// The main OpenSOVD HTTP Server structure.
 pub struct Server<T = VendorInfo> {
     config: ServerConfig<T>,
-    state: ServerState<T>,
+}
+
+fn configure<T>(cfg: &mut web::ServiceConfig, base_path: &str)
+where
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + schemars::JsonSchema + Clone + Send + Sync + 'static,
+{
+    cfg.service(
+        web::scope(base_path)
+            .guard(guard::Header("content-type", "application/json"))
+            .configure(routes::version::configure::<T>)
+            .service(web::scope("v1").configure(routes::entity::configure)),
+    );
 }
 
 impl<T> Server<T>
 where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + Sync + 'static,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + schemars::JsonSchema + Clone + Send + Sync + 'static,
 {
     /// Creates a new server instance.
     ///
@@ -54,80 +47,48 @@ where
     ///
     /// * `config` - The server configuration including binding and optional shutdown.
     pub fn new(config: ServerConfig<T>) -> Self {
-        info!("Creating new OpenSOVD server");
-
-        let state = ServerState {
-            vendor_info: config.vendor_info.clone(),
-            base_uri: config.base_uri.clone(),
-        };
-        Self { config, state }
-    }
-
-    /// Configures the Actix App routes and guards using ServiceConfig.
-    fn configure_app(cfg: &mut web::ServiceConfig, base_path: &str) {
-        cfg.service(
-            web::scope(base_path)
-                .guard(guard::Header("content-type", "application/json"))
-                .route("/version-info", web::get().to(get_version_info::<T>))
-                .service(web::scope("/v1").route("/version-info", web::get().to(get_version_info::<T>))),
-        );
+        Self { config }
     }
 
     /// Starts the HTTP server and binds to the configured address.
     ///
-    /// This function will run until the shutdown future completes.
-    pub async fn start(self) -> ServerResult<()> {
+    /// This method will block the current thread until the server is shut down.
+    /// To shut down the server gracefully, you can provide a shutdown signal
+    /// when creating the server configuration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the server shuts down gracefully, or an error if
+    /// the server fails to start or encounters an error during operation.
+    pub async fn start(self) -> Result<()> {
         info!("Starting OpenSOVD server");
 
-        let state = self.state.clone();
-        let base_path = self.config.base_uri.path().to_string();
+        let uri_path = self.config.uri_path.trim_end_matches('/').to_string();
+
         let server_builder = HttpServer::new(move || {
             let app = App::new()
-                .wrap(Logger::new("%a %{User-Agent}i"))
-                .app_data(web::Data::new(state.clone()))
-                .configure(|cfg| Self::configure_app(cfg, &base_path));
+                .app_data(web::Data::new(routes::BaseUri(self.config.uri_path.clone())))
+                .app_data(web::Data::new(self.config.vendor_info.clone()))
+                .wrap(Logger::default());
+
+            let app = app.configure(|cfg| configure::<T>(cfg, &uri_path));
             #[cfg(feature = "ui")]
-            let app = app.configure(configure_ui);
+            let app = app.configure(routes::ui::configure);
             app
         });
 
-        let server = match self.config.socket {
-            Some(Socket::TcpListener(ref listener)) => server_builder.listen(listener.try_clone()?)?,
+        let server = match self.config.listener {
+            Some(Listener::Tcp(ref listener)) => server_builder.listen(listener.try_clone()?)?,
             #[cfg(feature = "openssl")]
-            Some(Socket::SecureTcpListener(ref listener, ssl)) => {
+            Some(Listener::SecureTcp(ref listener, ssl)) => {
                 server_builder.listen_openssl(listener.try_clone()?, ssl)?
             }
             #[cfg(unix)]
-            Some(Socket::UnixSocket(ref listener)) => server_builder.listen_uds(listener.try_clone()?)?,
+            Some(Listener::Unix(ref listener)) => server_builder.listen_uds(listener.try_clone()?)?,
             None => {
-                let host = self.config.base_uri.host().unwrap_or("localhost");
-                let port = self.config.base_uri.port_u16().unwrap_or(9000);
-                match self.config.base_uri.scheme_str() {
-                    Some("http") => {
-                        let listener = TcpListener::bind(format!("{host}:{port}"))?;
-                        server_builder.listen(listener)?
-                    }
-                    #[cfg(feature = "openssl")]
-                    Some("https") => {
-                        let listener = TcpListener::bind(format!("{host}:{port}"))?;
-                        let builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
-                        server_builder.listen_openssl(listener, builder)?
-                    }
-                    #[cfg(unix)]
-                    Some("uds") => {
-                        let path = self.config.base_uri.path();
-                        let listener = UnixListener::bind(path)?;
-                        server_builder.listen_uds(listener)?
-                    }
-                    Some(schema) => {
-                        return Err(ServerError::BadConfiguration(format!(
-                            "Uri schema not supported: {schema}"
-                        )));
-                    }
-                    None => {
-                        return Err(ServerError::BadConfiguration(format!("Uri schema invalid")));
-                    }
-                }
+                return Err(Error::BadConfiguration(
+                    "No listener configured. Please configure a listener based on the URI scheme.".to_string(),
+                ));
             }
         };
 
@@ -136,37 +97,16 @@ where
         } else {
             server
         };
-        server.workers(1).run().await.map_err(ServerError::Io)
+        server.workers(1).run().await.map_err(Error::Io)
     }
-}
-
-/// Handles GET requests for `/version-info`.
-///
-/// This endpoint returns the current SOVD version information as a JSON object.
-async fn get_version_info<T>(state: web::Data<ServerState<T>>) -> impl actix_web::Responder
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + Sync + 'static,
-{
-    const ISO_VERSION: &str = "1.1";
-    let version_info = VersionInfo {
-        info: vec![sovd::models::version::Info {
-            version: ISO_VERSION.to_string(),
-            base_uri: state.base_uri.to_string(),
-            vendor_info: Some(state.vendor_info.clone()),
-        }],
-    };
-
-    let _ = schema_for_value!(version_info);
-    return web::Json(version_info);
-    //web::Json(serde_json::json!({"info":  version_info, "schema": schema_for_value!(version_info)}))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::server::DEFAULT_BASE_URI;
-    use actix_web::{App, test, web};
+    use actix_web::{App, test};
     use tokio::time::{Duration, timeout};
+
+    use super::*;
 
     #[actix_web::test]
     async fn test_server_timeout() {
@@ -192,6 +132,7 @@ mod tests {
     async fn test_server_uds() {
         use std::os::linux::net::SocketAddrExt;
         use std::os::unix::net::{SocketAddr, UnixListener};
+
         use tokio::time::{Duration, timeout};
 
         let socket_addr = SocketAddr::from_abstract_name("test_opensovd_server").unwrap();
@@ -211,19 +152,19 @@ mod tests {
 
     #[actix_web::test]
     async fn test_guard_positive() {
-        let state = ServerState {
-            vendor_info: Some(VendorInfo {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                name: "Test Server".to_string(),
-            }),
-            base_uri: DEFAULT_BASE_URI
-                .parse::<Uri>()
-                .expect("DEFAULT_BASE_URI should be valid"),
-        };
+        use crate::routes::BaseUri;
+
+        let base_uri = BaseUri("/".to_string());
+        let vendor_info: Option<VendorInfo> = Some(VendorInfo {
+            version: "1.0.0".to_string(),
+            name: "Test Vendor".to_string(),
+        });
+
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(state.clone()))
-                .configure(|cfg| Server::<VendorInfo>::configure_app(cfg, "/opensovd")),
+                .app_data(web::Data::new(base_uri))
+                .app_data(web::Data::new(vendor_info))
+                .configure(|cfg| configure::<VendorInfo>(cfg, "/opensovd")),
         )
         .await;
 
@@ -237,51 +178,33 @@ mod tests {
 
     #[actix_web::test]
     async fn test_guard_negative() {
-        use actix_web::{App, test, web};
-        let state = ServerState {
-            vendor_info: Some(VendorInfo {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                name: "Test Server".to_string(),
-            }),
-            base_uri: DEFAULT_BASE_URI
-                .parse::<Uri>()
-                .expect("DEFAULT_BASE_URI should be valid"),
-        };
+        use crate::routes::BaseUri;
+
+        let base_uri = BaseUri("/".to_string());
+        let vendor_info: Option<VendorInfo> = Some(VendorInfo {
+            version: "1.0.0".to_string(),
+            name: "Test Vendor".to_string(),
+        });
+
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(state.clone()))
-                .configure(|cfg| Server::<VendorInfo>::configure_app(cfg, "/opensovd")),
+                .app_data(web::Data::new(base_uri))
+                .app_data(web::Data::new(vendor_info))
+                .configure(|cfg| configure::<VendorInfo>(cfg, "/opensovd")),
         )
         .await;
-
         let req = test::TestRequest::get().uri("/opensovd/version-info").to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(
             resp.status(),
             actix_web::http::StatusCode::NOT_FOUND,
-            "Should return 404 without content-type"
+            "Should fail without correct content-type"
         );
     }
 
     #[actix_web::test]
     async fn test_guard_wrong_content_type() {
-        use actix_web::{App, test, web};
-        let state = ServerState {
-            vendor_info: Some(VendorInfo {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                name: "Test Server".to_string(),
-            }),
-            base_uri: DEFAULT_BASE_URI
-                .parse::<Uri>()
-                .expect("DEFAULT_BASE_URI should be valid"),
-        };
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(state.clone()))
-                .configure(|cfg| Server::<VendorInfo>::configure_app(cfg, "/opensovd")),
-        )
-        .await;
-
+        let app = test::init_service(App::new().configure(|cfg| configure::<VendorInfo>(cfg, "/opensovd"))).await;
         let req = test::TestRequest::get()
             .uri("/opensovd/version-info")
             .insert_header(("content-type", "text/plain"))
@@ -291,32 +214,33 @@ mod tests {
     }
 
     #[actix_web::test]
+    #[cfg(feature = "jsonschema-schemars")]
     async fn test_custom_vendor_info() {
-        use actix_web::{App, test, web};
+        use opensovd_models::version::VersionResponse;
         use serde::{Deserialize, Serialize};
 
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+        #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
         struct CustomVendorInfo {
             build_date: String,
             features: Vec<String>,
         }
 
-        let custom_vendor = CustomVendorInfo {
+        let _custom_vendor = CustomVendorInfo {
             build_date: "2025-01-01".to_string(),
             features: vec!["tracing".to_string(), "http2".to_string()],
         };
 
-        let state = ServerState {
-            vendor_info: Some(custom_vendor),
-            base_uri: DEFAULT_BASE_URI
-                .parse::<Uri>()
-                .expect("DEFAULT_BASE_URI should be valid"),
-        };
+        use crate::routes::BaseUri;
+
+        let base_uri = BaseUri("/".to_string());
+        let vendor_info: Option<CustomVendorInfo> = Some(_custom_vendor);
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(state))
-                .configure(|cfg| Server::<CustomVendorInfo>::configure_app(cfg, "/opensovd")),
+                .app_data(web::Data::new(base_uri))
+                .app_data(web::Data::new(vendor_info))
+                .configure(|cfg| configure::<CustomVendorInfo>(cfg, "/opensovd")),
         )
         .await;
 
@@ -330,34 +254,32 @@ mod tests {
 
         // Parse response body to verify custom data
         let body = test::read_body(resp).await;
-        let response: VersionInfo<CustomVendorInfo> = serde_json::from_slice(&body).unwrap();
+        let response: VersionResponse<CustomVendorInfo> = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(response.info.len(), 1);
-        assert_eq!(response.info[0].version, "1.1");
-        assert_eq!(response.info[0].base_uri, format!("{}", DEFAULT_BASE_URI));
+        assert_eq!(response.sovd_info.len(), 1);
+        assert_eq!(response.sovd_info[0].version, "1.1");
+        assert_eq!(response.sovd_info[0].base_uri, "/v1");
 
-        let vendor = response.info[0].vendor_info.as_ref().unwrap();
+        let vendor = response.sovd_info[0].vendor_info.as_ref().unwrap();
         assert_eq!(vendor.build_date, "2025-01-01");
         assert_eq!(vendor.features, vec!["tracing", "http2"]);
     }
 
     #[actix_web::test]
     async fn test_custom_base_path() {
-        use actix_web::{App, test, web};
+        use crate::routes::BaseUri;
 
-        // Test with custom base path
-        let state = ServerState {
-            vendor_info: Some(VendorInfo {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                name: "Test Server".to_string(),
-            }),
-            base_uri: "/api/v2/opensovd".parse::<Uri>().expect("should be valid"),
-        };
+        let base_uri = BaseUri("/".to_string());
+        let vendor_info: Option<VendorInfo> = Some(VendorInfo {
+            version: "1.0.0".to_string(),
+            name: "Test Vendor".to_string(),
+        });
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(state))
-                .configure(|cfg| Server::<VendorInfo>::configure_app(cfg, "/api/v2/opensovd")),
+                .app_data(web::Data::new(base_uri))
+                .app_data(web::Data::new(vendor_info))
+                .configure(|cfg| configure::<VendorInfo>(cfg, "/api/v2/opensovd")),
         )
         .await;
 
@@ -388,7 +310,7 @@ mod tests {
             .vendor_info(vendor_info)
             .shutdown(std::future::ready(()))
             .build();
-        assert!(config.socket.is_none());
+        assert!(config.listener.is_none());
 
         let server = Server::new(config);
         let result = timeout(Duration::from_secs(1), server.start()).await;
@@ -402,6 +324,7 @@ mod tests {
     #[actix_web::test]
     async fn test_server_shutdown_on_ctrl_c() {
         use std::net::TcpListener;
+
         use tokio::time::{Duration, sleep, timeout};
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();

@@ -13,8 +13,8 @@
 
 use clap::Parser;
 
-const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
-const DEFAULT_BASE_URI: &str = "http://localhost:9000/opensovd";
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
+const DEFAULT_BASE_URI: &str = "http://127.0.0.1:9000/opensovd";
 
 #[cfg(feature = "openssl")]
 #[derive(Parser)]
@@ -45,9 +45,9 @@ pub struct SslArgs {
 #[command(about = "OpenSOVD server")]
 #[command(version = VERSION)]
 pub struct Args {
-    /// Base URI of the OpenSOVD server
+    /// Base URL of the OpenSOVD server. Supports http://, https://, unix://, and http+unix:// schemes
     #[arg(short = 'u', long, default_value = DEFAULT_BASE_URI)]
-    pub uri: String,
+    pub url: String,
 
     #[cfg(feature = "openssl")]
     #[command(flatten)]

@@ -17,7 +17,7 @@ This cargo workspace contains the following crates and CLI tools for the OpenSOV
 
 | Crate | Type | Description |
 |-------|------|-------------|
-| [`sovd`](sovd/README.md) | Library | Core SOVD data structures and types |
+| [`opensovd-models`](opensovd-models/README.md) | Library | Core SOVD data structures and types |
 | [`opensovd-client`](opensovd-client/README.md) | Library | Client library for SOVD services |
 | [`opensovd-server`](opensovd-server/README.md) | Library | HTTP server with REST API endpoints |
 | [`opensovd-tracing`](opensovd-tracing/README.md) | Library | Conditional tracing with zero-cost abstractions |

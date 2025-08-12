@@ -12,9 +12,10 @@ version = { workspace = true }
 authors = { workspace = true }
 
 [features]
-default = ["tracing"]
+default = ["tracing", "jsonschema-schemars"]
 tracing = ["opensovd-tracing/tracing", "dep:tracing", "dep:tracing-subscriber"]
 ui = ["opensovd-server/ui"]
+jsonschema-schemars = ["schemars/derive", "opensovd-models/jsonschema-schemars"]
 
 [[bin]]
 name = "osovd-gateway"
@@ -28,9 +29,14 @@ path = "cli/src/main.rs"
 clap = { workspace = true }
 opensovd-server = { workspace = true }
 opensovd-tracing = { workspace = true }
-sovd = { workspace = true }
+opensovd-models = { workspace = true }
 tokio = { workspace = true }
+http = { workspace = true }
 openssl = { workspace = true, optional = true }
+url = "2.5"
+urlencoding = "2.1"
+serde = { workspace = true }
+schemars = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true, features = [
     "smallvec",
