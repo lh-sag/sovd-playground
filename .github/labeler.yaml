@@ -1,11 +1,17 @@
 doc:
   - "**/*.md"
-  - "CONTRIBUTING*"
   - "LICENSE"
   - "NOTICE"
 
 ci:
   - ".github/**"
+  - ".pre-commit-config.yaml"
+
+test:
+  - "tests/**"
+
+ui:
+  - "assets/**"
 
 crate:opensovd-models:
   - "opensovd-models/**"
@@ -21,3 +27,8 @@ crate:opensovd-cli:
 
 crate:opensovd-tracing:
   - "opensovd-tracing/**"
+
+crate:opensovd-diagnostic:
+  - "opensovd-diagnostic/**"
+
+

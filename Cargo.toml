@@ -5,6 +5,7 @@ members = [
     "opensovd-server",
     "opensovd-cli",
     "opensovd-tracing",
+    "opensovd-diagnostic",
 ]
 resolver = "2"
 
@@ -20,6 +21,7 @@ version = "0.0.1"
 
 [workspace.dependencies]
 opensovd-models = { version = "0.0.1", path = "opensovd-models" }
+opensovd-diagnostic = { version = "0.0.1", path = "opensovd-diagnostic" }
 
 opensovd-client = { version = "0.0.1", path = "opensovd-client" }
 opensovd-server = { version = "0.0.1", path = "opensovd-server" }
@@ -56,14 +58,23 @@ tracing-subscriber = { version = "0.3.19", features = [
     "alloc",
     "fmt",
 ], default-features = false }
+tracing-log = { version = "0.2.0", default-features = false }
+log = { version = "0.4", default-features = false }
 openssl = { version = "0.10.73", default-features = false }
 futures-core = { version = "0.3.31", default-features = false, features = [
     "alloc",
 ] }
-thiserror = { version = "1.0", default-features = false }
+derive_more = { version = "2.0", default-features = false }
+
 http = { version = "1.1", default-features = false, features = ["std"] }
 schemars = { version = "1.0.4", default-features = false }
-
+hyper = { version = "1.7.0", default-features = false }
+hyper-util = { version = "0.1.16", default-features = false }
+http-body-util = { version = "0.1", default-features = false }
+url = { version = "2.5", default-features = false }
+urlencoding = { version = "2.1", default-features = false }
+hyper-openssl = { version = "0.10", default-features = false }
+tokio-openssl = { version = "0.6", default-features = false }
 
 [profile.release]
 codegen-units = 1

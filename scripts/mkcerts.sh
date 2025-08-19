@@ -1,14 +1,37 @@
 #!/bin/bash
+#
+# Copyright (c) 2025 The Contributors to Eclipse OpenSOVD.
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 
 # Certificate generation and testing script for osovd-gateway HTTPS with client certificates
-# Usage: ./mkcerts.sh [output_dir] [validity_days]
+# Usage: ./mkcerts.sh [output_dir] [validity_days] [--no-verify]
 
 set -e
 
 # Default parameters
 OUTPUT_DIR="${1:-./certs}"
 VALIDITY_DAYS="${2:-3650}"  # Default 10 years
+NO_VERIFY=false
 URL="https://127.0.0.1:8443/opensovd"
+
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --no-verify)
+            NO_VERIFY=true
+            shift
+            ;;
+    esac
+done
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
@@ -18,25 +41,30 @@ echo "Generating certificates ($VALIDITY_DAYS days) in: $OUTPUT_DIR"
 
 # CA
 openssl genrsa -out ca-key.pem 4096
-openssl req -new -x509 -days "$VALIDITY_DAYS" -key ca-key.pem -sha256 -out ca-cert.pem -subj "/C=DE/O=OpenSOVD/CN=OpenSOVD CA"
+openssl req -new -x509 -days "$VALIDITY_DAYS" -key ca-key.pem -sha256 -out ca-cert.pem -subj "/C=DE/O=OpenSOVD/CN=OpenSOVD CA" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,digitalSignature,keyCertSign,cRLSign"
 
 # Server
 openssl genrsa -out server-key.pem 4096
 openssl req -subj "/C=DE/O=OpenSOVD/CN=127.0.0.1" -sha256 -new -key server-key.pem -out server.csr
-openssl x509 -req -days "$VALIDITY_DAYS" -sha256 -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -out server-cert.pem -CAcreateserial
+openssl x509 -req -days "$VALIDITY_DAYS" -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -out server-cert.pem -CAcreateserial -extfile <(echo "basicConstraints=CA:FALSE"; echo "keyUsage=critical,digitalSignature,keyEncipherment"; echo "extendedKeyUsage=serverAuth"; echo "subjectAltName=IP:127.0.0.1,DNS:localhost")
 
 # Client
 openssl genrsa -out client-key.pem 4096
 openssl req -subj "/C=DE/O=OpenSOVD/CN=test-client" -new -key client-key.pem -out client.csr
-openssl x509 -req -days "$VALIDITY_DAYS" -sha256 -in client.csr -CA ca-cert.pem -CAkey ca-key.pem -out client-cert.pem -CAcreateserial
+openssl x509 -req -days "$VALIDITY_DAYS" -in client.csr -CA ca-cert.pem -CAkey ca-key.pem -out client-cert.pem -CAcreateserial -extfile <(echo "basicConstraints=CA:FALSE"; echo "keyUsage=critical,digitalSignature,keyEncipherment"; echo "extendedKeyUsage=clientAuth")
 
-rm *.csr
+rm ./*.csr
 
-chmod 600 *-key.pem
+chmod 600 ./*-key.pem
 echo "Certificates generated"
 
 # Get absolute path for commands
 CERT_DIR="$(pwd)"
+
+# Exit early if --no-verify is specified
+if [ "$NO_VERIFY" = true ]; then
+    exit 0
+fi
 
 # Test
 echo "Testing..."

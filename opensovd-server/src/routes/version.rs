@@ -10,9 +10,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use actix_web::{Error, web};
+use actix_web::web;
 use opensovd_models::JsonSchema;
-use opensovd_models::{IncludeSchemaParam, version::VersionResponse};
+use opensovd_models::version::VersionResponse;
+
+use crate::response::ApiResult;
 
 pub(crate) fn configure<T>(cfg: &mut web::ServiceConfig)
 where
@@ -27,20 +29,24 @@ where
 async fn get_version<T>(
     base_uri: web::Data<super::BaseUri>,
     vendor_info: web::Data<Option<T>>,
-    include_schema: Result<web::Query<IncludeSchemaParam>, Error>,
-) -> impl actix_web::Responder
+) -> ApiResult<VersionResponse<T>>
 where
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + JsonSchema + Clone + Send + Sync + 'static,
 {
     // Map ISO to API version.
     const VERSION: (&str, &str) = ("1.1", "v1");
-    let version_info = VersionResponse {
-        sovd_info: vec![opensovd_models::version::Info {
-            version: VERSION.0.to_string(),
-            base_uri: base_uri.0.to_string() + VERSION.1,
-            vendor_info: vendor_info.as_ref().clone(),
-        }],
-    };
-
-    super::make_response(version_info, include_schema)
+    ApiResult::ok(VersionResponse {
+        sovd_info: vec![
+            opensovd_models::version::Info {
+                version: VERSION.0.to_string(),
+                base_uri: format!("{}/{}", base_uri.0.trim_end_matches('/'), VERSION.1),
+                vendor_info: vendor_info.as_ref().clone(),
+            },
+            opensovd_models::version::Info {
+                version: "1.2".to_string(),
+                base_uri: format!("{}/{}", base_uri.0.trim_end_matches('/'), "v2"),
+                vendor_info: vendor_info.as_ref().clone(),
+            },
+        ],
+    })
 }

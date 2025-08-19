@@ -1,4 +1,7 @@
-// Copyright (c) Contributors to the Eclipse Foundation
+// Copyright (c) 2025 The Contributors to Eclipse OpenSOVD.
+//
+// See the NOTICE file(s) distributed with this work for additional
+// information regarding copyright ownership.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Apache License, Version 2.0 which is available at
@@ -11,14 +14,15 @@
 // under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-use actix_web::{Error, web};
-use opensovd_models::IncludeSchemaParam;
+use actix_web::web;
+use opensovd_diagnostic::Diagnostic;
 use opensovd_models::entity::{ComponentCapabilitiesResponse, EntityId, EntityReference, EntityResponse};
 
+use crate::response::ApiResult;
 
 pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.route("/components", web::get().to(get_entities))
-        .route("/components/{id}", web::get().to(get_entity_capabilities));
+    cfg.route("/components", web::get().to(list_entities))
+        .route("/components/{id}", web::get().to(list_capabilities));
     // TODO
     // GET /components/{component-id}/
     // GET /components/{component-id}/subcomponents
@@ -26,36 +30,67 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     // GET /components/{component-id}/depends-on
 }
 
-async fn get_entities(
+// GET /components
+async fn list_entities(
     base_uri: web::Data<super::BaseUri>,
-    include_schema: Result<web::Query<IncludeSchemaParam>, Error>,
-) -> impl actix_web::Responder {
-    let response = EntityResponse {
-        items: vec![EntityReference {
-            entity: EntityId {
-                id: "DrivingComputer".to_string(),
-                name: "Driving Computer".to_string(),
+    diagnostic: web::Data<Diagnostic>,
+) -> ApiResult<EntityResponse> {
+    // Collect components from the diagnostic system
+    let items: Vec<EntityReference> = diagnostic
+        .components()
+        .map(|component| {
+            let id = component.id().clone();
+            let name = component.name().to_string();
+            let href = format!("{}/components/{}", base_uri.0, id);
+
+            EntityReference {
+                entity: EntityId {
+                    id,
+                    name,
+                    ..Default::default()
+                },
+                href,
                 ..Default::default()
-            },
-            href: format!("{}/components/{}", base_uri.0.to_string(), "DrivingComputer"),
-            ..Default::default()
-        }],
-    };
-    super::make_response(response, include_schema)
+            }
+        })
+        .collect();
+    if items.is_empty() {
+        return ApiResult::err(crate::error::ApiError::not_found("No components found".to_string()));
+    }
+    ApiResult::ok(EntityResponse { items })
 }
 
-async fn get_entity_capabilities(
-    _base_uri: web::Data<super::BaseUri>,
+async fn list_capabilities(
+    base_uri: web::Data<super::BaseUri>,
     component: web::Path<(String,)>,
-    include_schema: Result<web::Query<IncludeSchemaParam>, Error>,
-) -> impl actix_web::Responder {
-    let response = ComponentCapabilitiesResponse {
-        entity: EntityId {
-            id: component.0.clone(),
-            name: component.0.clone(),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    super::make_response(response, include_schema)
+    diagnostic: web::Data<Diagnostic>,
+) -> ApiResult<ComponentCapabilitiesResponse> {
+    // Try to get the component from the diagnostic system
+    let component_id = &component.0;
+
+    match diagnostic.get_component(component_id) {
+        Some(comp) => {
+            // Check what resources the component has
+            let mut resources = opensovd_models::entity::Resources::default();
+
+            // Check if component has Data resource
+            if comp.resource().has_data_resource() {
+                resources.data = Some(format!("{}/components/{}/data", base_uri.0, component_id));
+                resources.data_list = Some(format!("{}/components/{}/data-list", base_uri.0, component_id));
+            }
+
+            ApiResult::ok(ComponentCapabilitiesResponse {
+                entity: EntityId {
+                    id: comp.id().clone(),
+                    name: comp.name().to_string(),
+                    ..Default::default()
+                },
+                resources,
+                ..Default::default()
+            })
+        }
+        None => ApiResult::err(crate::error::ApiError::not_found(format!(
+            "Component '{component_id}' not found"
+        ))),
+    }
 }

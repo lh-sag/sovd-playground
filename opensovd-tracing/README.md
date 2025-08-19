@@ -8,7 +8,7 @@ adding tracing throughout code that can be completely disabled at compile time w
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `tracing` | No | Enables actual tracing functionality. When disabled, all tracing macros compile to no-ops with zero runtime overhead |
+| `tracing` | No | Enables actual tracing functionality. When disabled, all macros compile to no-ops with zero overhead |
 
 ## Usage
 

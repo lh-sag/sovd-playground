@@ -1,0 +1,10 @@
+[package]
+name = "opensovd-diagnostic"
+description = "Diagnostic entity system for SOVD"
+edition = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }

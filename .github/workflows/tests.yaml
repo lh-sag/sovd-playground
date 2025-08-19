@@ -1,0 +1,83 @@
+name: Tests
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  pytest:
+    name: Python Integration Tests (${{ matrix.os }}, ${{ matrix.profile }})
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-15] # Unsupported: windows-2025
+        profile: [release]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      actions: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get expected target triple
+        id: target
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-24.04)
+              echo "triple=x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT
+              ;;
+            windows-2025)
+              echo "triple=x86_64-pc-windows-msvc" >> $GITHUB_OUTPUT
+              ;;
+            macos-15)
+              echo "triple=aarch64-apple-darwin" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "Unknown OS: ${{ matrix.os }}"
+              exit 1
+              ;;
+          esac
+        shell: bash
+
+      - name: Download osovd-gateway binary
+        uses: actions/download-artifact@v4
+        with:
+          name: osovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: ./binaries
+
+      - name: List downloaded files
+        run: |
+          echo "Downloaded files:"
+          ls -la ./binaries/
+        shell: bash
+
+      - name: Make binary executable (Unix)
+        if: runner.os != 'Windows'
+        run: chmod +x ./binaries/osovd-gateway-${{ steps.target.outputs.triple }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          activate-environment: true
+          enable-cache: true
+          prune-cache: false
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Run pytest with pre-built binary (Unix)
+        run: |
+          uv run playwright install chromium
+          uv run pytest -v -s --osovd-gateway-bin=./binaries/osovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}

@@ -14,10 +14,11 @@ env:
 
 jobs:
   build:
-    name: Build and test (${{ matrix.os }})
+    name: Build and test (${{ matrix.os }}, ${{ matrix.profile }})
     strategy:
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-15] # ubuntu-24.04-arm, windows-2025-arm
+        profile: [release]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -37,9 +38,35 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ci-${{ matrix.os }}
+      - name: Get Rust target triple
+        id: target
+        run: |
+          TARGET=$(rustc -vV | grep host | cut -d' ' -f2)
+          echo "triple=$TARGET" >> $GITHUB_OUTPUT
+          echo "Rust target triple: $TARGET"
+        shell: bash
       - name: Build
-        run: cargo build --locked --workspace --all-targets --all-features
+        run: cargo build --locked --workspace --all-targets --all-features --profile ${{ matrix.profile }}
       - name: Test
-        run: cargo test --locked --workspace --all-targets --all-features
+        run: cargo test --locked --workspace --all-targets --all-features --profile ${{ matrix.profile }}
       - name: Doc test
-        run: cargo test --locked --workspace --doc --all-features
+        run: cargo test --locked --workspace --doc --all-features --profile ${{ matrix.profile }}
+      - name: Rename binary with target triple
+        run: |
+          BINARY_NAME="osovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}"
+          SOURCE_PATH="target/${{ matrix.profile }}/osovd-gateway${{ runner.os == 'Windows' && '.exe' || '' }}"
+          if [ -f "$SOURCE_PATH" ]; then
+            mv "$SOURCE_PATH" "target/${{ matrix.profile }}/$BINARY_NAME"
+            echo "Renamed binary to: $BINARY_NAME"
+          else
+            echo "Warning: Source binary not found at $SOURCE_PATH"
+            ls -la target/${{ matrix.profile }}/
+          fi
+        shell: bash
+      - name: Upload osovd-gateway binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: osovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
+          path: |
+            target/${{ matrix.profile }}/osovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}
+          retention-days: 1

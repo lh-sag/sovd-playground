@@ -12,6 +12,7 @@
 //
 
 pub mod entity;
+pub mod error;
 pub mod version;
 
 /// A trait for types that can generate JSON schemas.

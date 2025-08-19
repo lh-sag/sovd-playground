@@ -16,12 +16,14 @@
 //! This crate provides HTTP server implementations for the OpenSOVD project.
 //! Currently supports Actix-web based server with REST API endpoints.
 
-mod error;
-mod routes;
+pub mod error;
+pub mod response;
+pub mod routes;
 mod server;
-mod server_actix;
+mod server_config;
 
 // Re-export main types for convenience
-pub use error::{Error, Result};
-pub use server::{ServerConfig, ServerConfigBuilder};
-pub use server_actix::Server;
+pub use error::{ApiError, Error, Result, VendorError};
+pub use response::ApiResult;
+pub use server::Server;
+pub use server_config::{ServerConfig, ServerConfigBuilder};

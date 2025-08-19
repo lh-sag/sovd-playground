@@ -1,0 +1,238 @@
+name: Latest Release
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: |
+          # Get latest release version from GitHub API
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/orhun/git-cliff/releases/latest | grep -Po '"tag_name": "v\K[^"]*')
+          ARCH=$(uname -m)
+          FILENAME="git-cliff-${LATEST_VERSION}-${ARCH}-unknown-linux-gnu.tar.gz"
+          DOWNLOAD_URL="https://github.com/orhun/git-cliff/releases/download/v${LATEST_VERSION}/${FILENAME}"
+
+          echo "Downloading git-cliff v${LATEST_VERSION} from: $DOWNLOAD_URL"
+
+          # Download to a file first to check if it's valid
+          if ! curl -L -f -o git-cliff.tar.gz "$DOWNLOAD_URL"; then
+            echo "Failed to download git-cliff from primary URL, trying fallback..."
+            # Fallback: try without version prefix in case URL structure changes
+            FALLBACK_URL="https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-${ARCH}-unknown-linux-gnu.tar.gz"
+            echo "Trying fallback URL: $FALLBACK_URL"
+            curl -L -f -o git-cliff.tar.gz "$FALLBACK_URL" || {
+              echo "Both download attempts failed"
+              exit 1
+            }
+          fi
+
+          # Verify it's actually a gzip file
+          if ! file git-cliff.tar.gz | grep -q "gzip compressed"; then
+            echo "Downloaded file is not a valid gzip archive:"
+            file git-cliff.tar.gz
+            head -20 git-cliff.tar.gz
+            exit 1
+          fi
+
+          # Extract and install - binary might be in subdirectory
+          tar -xzf git-cliff.tar.gz
+
+          # Find the git-cliff binary (might be in subdirectory or root)
+          BINARY_PATH=$(find . -name "git-cliff" -type f -executable | head -1)
+          if [ -z "$BINARY_PATH" ]; then
+            echo "git-cliff binary not found after extraction"
+            ls -la
+            exit 1
+          fi
+
+          echo "Found git-cliff at: $BINARY_PATH"
+          sudo mv "$BINARY_PATH" /usr/local/bin/git-cliff
+
+          # Verify installation
+          git-cliff --version
+
+          # Clean up
+          rm -f git-cliff.tar.gz
+          rm -rf git-cliff-*/
+
+      - name: Delete existing latest release
+        run: |
+          # Check if the release exists and delete it
+          if gh release view latest --repo ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Deleting existing 'latest' release..."
+            gh release delete latest --repo ${{ github.repository }} --yes
+          else
+            echo "No existing 'latest' release found"
+          fi
+
+          # Also delete the tag if it exists
+          if git tag -l | grep -q "^latest$"; then
+            echo "Deleting existing 'latest' tag..."
+            git push --delete origin latest || true
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download CI artifacts
+        id: download-artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: release-assets
+
+      - name: Check artifact download status
+        run: |
+          if [ "${{ steps.download-artifacts.outcome }}" = "failure" ]; then
+            echo "Warning: Failed to download CI artifacts from workflow run ${{ github.event.workflow_run.id }}"
+            echo "This might be because:"
+            echo "- The CI workflow didn't upload any artifacts"
+            echo "- The artifacts have expired"
+            echo "- There was a permission issue"
+            echo "Proceeding with source-only release..."
+            mkdir -p release-assets
+          else
+            echo "Successfully downloaded artifacts"
+            if [ -d "release-assets" ] && [ "$(ls -A release-assets 2>/dev/null)" ]; then
+              echo "Artifacts found:"
+              ls -la release-assets/
+            else
+              echo "No artifacts found in download"
+            fi
+          fi
+
+      - name: Prepare release assets
+        run: |
+          # Check if any artifacts were downloaded
+          if [ ! -d "release-assets" ] || [ -z "$(ls -A release-assets 2>/dev/null)" ]; then
+            echo "No artifacts found, creating minimal release with source only"
+            mkdir -p release-assets
+          else
+            echo "Found artifacts:"
+            ls -la release-assets/
+          fi
+
+          cd release-assets
+
+          # Extract artifacts (they come as zip files) with error checking
+          if ls *.zip 1> /dev/null 2>&1; then
+            for zip_file in *.zip; do
+              if [ -f "$zip_file" ]; then
+                echo "Extracting $zip_file"
+                if unzip -t "$zip_file" >/dev/null 2>&1; then
+                  unzip -o "$zip_file"
+                  rm "$zip_file"
+                else
+                  echo "Warning: $zip_file is corrupted, skipping"
+                  rm "$zip_file"
+                fi
+              fi
+            done
+          else
+            echo "No zip files found in artifacts"
+          fi
+
+          # Find and move binary files from subdirectories to root
+          echo "Looking for binary files in subdirectories..."
+          echo "Directory structure before processing:"
+          find . -type f -name "*osovd-gateway*" | head -10
+
+          # Handle both new target-triple format and legacy format
+          find . -type f \( -name "osovd-gateway-*" -o -name "osovd-gateway" -o -name "osovd-gateway.exe" \) | while read -r binary; do
+            if [ -f "$binary" ] && [ "$binary" != "./$(basename "$binary")" ]; then
+              echo "Moving binary: $binary -> $(basename "$binary")"
+              mv "$binary" "./$(basename "$binary")"
+            fi
+          done
+
+          echo "Files in release-assets after processing:"
+          ls -la
+
+          # Remove empty directories
+          find . -type d -empty -delete 2>/dev/null || true
+
+          # Create web UI archive from assets directory if it exists
+          if [ -d "assets" ]; then
+            echo "Creating web UI archive from assets directory"
+            tar -czf opensovd-web-ui.tar.gz assets/
+          elif [ -f "index.html" ]; then
+            echo "Creating web UI archive from HTML files"
+            # If assets are in root, create archive
+            mkdir -p web-ui
+            mv *.html *.css *.js web-ui/ 2>/dev/null || true
+            if [ "$(ls -A web-ui 2>/dev/null)" ]; then
+              tar -czf opensovd-web-ui.tar.gz web-ui/
+            fi
+          fi
+
+          cd ..
+          echo "Final release assets:"
+          ls -la release-assets/
+
+      - name: Generate changelog
+        run: |
+          # Generate changelog with fallback
+          if git-cliff --unreleased --output CHANGELOG.md 2>/dev/null; then
+            echo "✓ Generated changelog with git-cliff"
+          fi
+
+          cp CHANGELOG.md release-assets/
+
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "message=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+          echo "date=$(git log -1 --pretty=%ad --date=iso)" >> $GITHUB_OUTPUT
+
+      - name: Create new latest release
+        run: |
+          echo "Creating release with assets:"
+          ls -la release-assets/
+
+          # Check if we have any files to upload
+          if [ -n "$(find release-assets -type f -maxdepth 1)" ]; then
+            echo "Found files to upload"
+            # Create the release using CHANGELOG.md as release notes
+            gh release create latest \
+              --repo ${{ github.repository }} \
+              --title "Latest Development Build" \
+              --notes-file CHANGELOG.md \
+              --prerelease \
+              release-assets/*
+          else
+            echo "No files found in release-assets, creating release without assets"
+            # Create the release without assets
+            gh release create latest \
+              --repo ${{ github.repository }} \
+              --title "Latest Development Build" \
+              --notes-file CHANGELOG.md \
+              --prerelease
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Update latest tag
+        run: |
+          # Create/update the latest tag to point to current commit
+          git tag -f latest
+          git push origin latest --force
