@@ -16,6 +16,7 @@
 //! This crate provides HTTP server implementations for the OpenSOVD project.
 //! Currently supports Actix-web based server with REST API endpoints.
 
+pub mod convert;
 pub mod error;
 pub mod response;
 pub mod routes;

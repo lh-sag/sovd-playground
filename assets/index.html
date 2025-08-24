@@ -398,6 +398,58 @@
                 color: var(--text-primary);
                 text-align: right;
             }
+
+            /* Breadcrumb styling */
+            .breadcrumb {
+                background-color: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                padding: 0.5rem 0.75rem;
+                margin: 0;
+                font-size: 0.9rem;
+            }
+
+            .breadcrumb-item + .breadcrumb-item::before {
+                content: ">";
+                color: var(--text-muted);
+            }
+
+            .breadcrumb-item a:hover {
+                color: var(--text-primary) !important;
+                text-decoration: underline !important;
+            }
+
+            .breadcrumb-item.active {
+                font-weight: 500;
+            }
+
+            .breadcrumb-item i {
+                margin-right: 0.25rem;
+                font-size: 0.85rem;
+            }
+
+            /* Table theming - override Bootstrap defaults */
+            .table {
+                --bs-table-bg: var(--bg-primary) !important;
+                --bs-table-color: var(--text-primary) !important;
+                --bs-table-border-color: var(--border-color) !important;
+            }
+
+            .table th {
+                background-color: var(--bg-secondary) !important;
+                color: var(--text-primary) !important;
+                border-color: var(--border-color) !important;
+            }
+
+            .table td {
+                background-color: var(--bg-primary) !important;
+                color: var(--text-primary) !important;
+                border-color: var(--border-color) !important;
+            }
+
+            .table tbody tr {
+                background-color: var(--bg-primary) !important;
+            }
         </style>
     </head>
     <body>
@@ -515,6 +567,28 @@
 
                 <!-- Main panel -->
                 <div class="main-panel">
+                    <!-- Breadcrumb Navigation -->
+                    <nav v-if="selectedItem" aria-label="breadcrumb" class="mb-3" style="margin: -1.5rem -1.5rem 1rem -1.5rem;">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="#" @click.prevent="clearSelection()" style="color: var(--text-secondary); text-decoration: none;">
+                                    <i class="bi bi-diagram-3"></i>
+                                    Components
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="#" @click.prevent="selectComponentFromBreadcrumb()" style="color: var(--text-secondary); text-decoration: none;">
+                                    <i class="bi bi-box"></i>
+                                    {{ selectedItem.name || selectedItem.componentName || selectedItem.id }}
+                                </a>
+                            </li>
+                            <li v-if="selectedItem.type === 'resource'" class="breadcrumb-item active" aria-current="page" style="color: var(--text-primary);">
+                                <i :class="getResourceIcon(selectedItem.key)"></i>
+                                {{ formatResourceName(selectedItem.key) }}
+                            </li>
+                        </ol>
+                    </nav>
+
                     <div v-if="!selectedItem" class="empty-state">
                         <i
                             class="bi bi-arrow-left-circle"
@@ -542,11 +616,6 @@
                     <div
                         v-else-if="selectedItem.type === 'component' && componentDetails"
                     >
-                        <h4 class="mb-4">
-                            <i class="bi bi-box"></i>
-                            {{ componentDetails.name || componentDetails.id }}
-                        </h4>
-
                         <div class="info-card">
                             <h6 class="mb-3">Component Information</h6>
                             <div class="info-row">
@@ -637,31 +706,66 @@
                     </div>
 
                     <div v-else-if="selectedItem.type === 'resource'">
-                        <h4 class="mb-4">
-                            <i :class="getResourceIcon(selectedItem.key)"></i>
-                            {{ formatResourceName(selectedItem.key) }}
-                        </h4>
-
-                        <div class="info-card">
-                            <h6 class="mb-3">Resource Information</h6>
-                            <div class="info-row">
-                                <span class="info-label">Component:</span>
-                                <span class="info-value"
-                                    >{{ selectedItem.componentName }}</span
-                                >
+                        <!-- Resource Data Display -->
+                        <div v-if="resourceData" class="info-card">
+                            <h6 class="mb-3">Resource Data</h6>
+                            
+                            <!-- For data resources with items array -->
+                            <div v-if="resourceData.items && Array.isArray(resourceData.items)">
+                                <div v-if="resourceData.items.length === 0" class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    No data items available in this resource.
+                                </div>
+                                <div v-else>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm" style="color: var(--text-primary); background-color: var(--bg-primary); border-color: var(--border-color);">
+                                            <thead style="background-color: var(--bg-secondary);">
+                                                <tr>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">ID</th>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Name</th>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Category</th>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Groups</th>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Tags</th>
+                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Read Only</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="item in resourceData.items" :key="item.id" style="background-color: var(--bg-primary);">
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);"><code style="font-size: 0.8rem; color: var(--text-primary); background-color: var(--bg-secondary); padding: 0.2rem 0.3rem; border-radius: 3px;">{{ item.id }}</code></td>
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">{{ item.name || 'N/A' }}</td>
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);"><span class="badge" style="background-color: var(--accent-color); color: #000;">{{ item.category }}</span></td>
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
+                                                        <span v-for="group in (item.groups || [])" :key="group" class="badge me-1" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                                            {{ group }}
+                                                        </span>
+                                                        <span v-if="!item.groups || item.groups.length === 0" style="color: var(--text-muted);">None</span>
+                                                    </td>
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
+                                                        <span v-for="tag in (item.tags || [])" :key="tag" class="badge me-1" style="background-color: var(--text-secondary); color: var(--bg-primary);">
+                                                            {{ tag }}
+                                                        </span>
+                                                        <span v-if="!item.tags || item.tags.length === 0" style="color: var(--text-muted);">None</span>
+                                                    </td>
+                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
+                                                        <i :class="item.read_only ? 'bi bi-lock' : 'bi bi-unlock'" :style="item.read_only ? 'color: var(--accent-color);' : 'color: #28a745;'"></i>
+                                                        {{ item.read_only ? 'Yes' : 'No' }}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="info-row">
-                                <span class="info-label">Endpoint:</span>
-                                <span class="info-value"
-                                    ><code>{{ selectedItem.value }}</code></span
-                                >
+                            
+                            <!-- For other resource types, display as JSON -->
+                            <div v-else>
+                                <pre style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 4px; color: var(--text-primary); font-size: 0.85rem; max-height: 400px; overflow-y: auto;"><code>{{ JSON.stringify(resourceData, null, 2) }}</code></pre>
                             </div>
                         </div>
 
-                        <div class="alert alert-info">
+                        <div v-else-if="!loadingDetails" class="alert alert-info">
                             <i class="bi bi-info-circle"></i>
-                            Resource interaction will be available in a future
-                            update.
+                            No data available for this resource.
                         </div>
                     </div>
                 </div>
@@ -732,6 +836,7 @@
                         componentsWithResources: [],
                         selectedItem: null,
                         componentDetails: null,
+                        resourceData: null,
                         loadingComponents: false,
                         loadingDetails: false,
                         expandedComponents: {},
@@ -950,6 +1055,7 @@
                             name: component.name,
                         };
                         this.componentDetails = null;
+                        this.resourceData = null;
                         this.loadingDetails = true;
 
                         await fetch(
@@ -981,7 +1087,7 @@
                             });
                     },
 
-                    selectResource(component, resource) {
+                    async selectResource(component, resource) {
                         this.selectedItem = {
                             type: "resource",
                             key: resource.key,
@@ -990,6 +1096,34 @@
                             componentName: component.name || component.id,
                         };
                         this.componentDetails = null;
+                        this.resourceData = null;
+                        this.loadingDetails = true;
+
+                        // Fetch data from the resource endpoint
+                        await fetch(resource.value, {
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        })
+                            .then((response) => {
+                                if (response.ok) {
+                                    return response.json();
+                                }
+                                return null;
+                            })
+                            .then((data) => {
+                                this.resourceData = data;
+                            })
+                            .catch((error) => {
+                                console.error(
+                                    "Failed to fetch resource data:",
+                                    error,
+                                );
+                                this.resourceData = null;
+                            })
+                            .finally(() => {
+                                this.loadingDetails = false;
+                            });
                     },
 
                     formatResourceName(name) {
@@ -1118,6 +1252,74 @@
                             return Object.entries(vendorInfo);
                         }
                         return [];
+                    },
+
+                    clearSelection() {
+                        this.selectedItem = null;
+                        this.componentDetails = null;
+                        this.resourceData = null;
+                    },
+
+                    async selectComponentFromBreadcrumb() {
+                        if (!this.selectedItem) return;
+                        
+                        let componentId;
+                        let componentName;
+                        
+                        if (this.selectedItem.type === 'component') {
+                            componentId = this.selectedItem.id;
+                            componentName = this.selectedItem.name;
+                        } else if (this.selectedItem.type === 'resource') {
+                            componentId = this.selectedItem.componentId;
+                            componentName = this.selectedItem.componentName;
+                        }
+                        
+                        if (componentId) {
+                            // Find the component in our list
+                            const component = this.componentsWithResources.find(c => c.id === componentId);
+                            if (component) {
+                                // Expand the component to show its resources
+                                this.expandedComponents[componentId] = true;
+                                
+                                // Select the component
+                                this.selectedItem = {
+                                    type: "component",
+                                    id: componentId,
+                                    name: componentName,
+                                };
+                                this.componentDetails = null;
+                                this.resourceData = null;
+                                this.loadingDetails = true;
+
+                                await fetch(
+                                    `${this.apiBaseUrl}/components/${componentId}`,
+                                    {
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                    },
+                                )
+                                    .then((response) => {
+                                        if (response.ok) {
+                                            return response.json();
+                                        }
+                                        return null;
+                                    })
+                                    .then((data) => {
+                                        this.componentDetails = data;
+                                    })
+                                    .catch((error) => {
+                                        console.error(
+                                            "Failed to fetch component details:",
+                                            error,
+                                        );
+                                        this.componentDetails = null;
+                                    })
+                                    .finally(() => {
+                                        this.loadingDetails = false;
+                                    });
+                            }
+                        }
                     },
                 },
                 mounted() {

@@ -1048,6 +1048,7 @@ dependencies = [
 name = "opensovd-diagnostic"
 version = "0.0.1"
 dependencies = [
+ "opensovd-models",
  "serde",
  "serde_json",
 ]
@@ -1056,6 +1057,7 @@ dependencies = [
 name = "opensovd-models"
 version = "0.0.1"
 dependencies = [
+ "derive_more 2.0.1",
  "schemars",
  "serde",
  "serde_json",

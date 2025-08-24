@@ -94,3 +94,67 @@ pub struct ComponentCapabilitiesResponse {
     #[serde(flatten)]
     pub resources: Resources,
 }
+
+/// Response for listing data resources
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataResourceResponse {
+    pub items: Vec<DataResourceItem>,
+}
+
+/// Data resource item metadata for listings
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataResourceItem {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub translation_id: Option<String>,
+    pub category: String, // identData, currentData, storedData, sysInfo
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+/// Response for reading a specific data value
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataValueResponse {
+    pub id: String,
+    pub data: serde_json::Value,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<DataErrorResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema: Option<serde_json::Value>,
+}
+
+/// Data error for partial failures
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataErrorResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    pub error: crate::error::GenericError<serde_json::Value>, // Generic vendor error
+}
+
+/// Request for writing data
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataWriteRequest {
+    pub data: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+}
+
+/// Query parameters for data resource listing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+pub struct DataResourceQuery {
+    #[serde(default)]
+    pub categories: Vec<String>, // Filter by categories
+    #[serde(default)]
+    pub groups: Vec<String>, // Filter by groups
+    #[serde(rename = "include-schema", default)]
+    pub include_schema: bool, // Include schema in response
+}

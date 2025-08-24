@@ -73,10 +73,10 @@ async fn list_capabilities(
             // Check what resources the component has
             let mut resources = opensovd_models::entity::Resources::default();
 
-            // Check if component has Data resource
+            // Check if component has a data resource
             if comp.resource().has_data_resource() {
-                resources.data = Some(format!("{}/components/{}/data", base_uri.0, component_id));
-                resources.data_list = Some(format!("{}/components/{}/data-list", base_uri.0, component_id));
+                resources.data = Some(format!("/opensovd/v1/components/{}/data", component_id));
+                resources.data_list = Some(format!("/opensovd/v1/components/{}/data-lists", component_id));
             }
 
             ApiResult::ok(ComponentCapabilitiesResponse {

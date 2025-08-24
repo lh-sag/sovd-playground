@@ -16,22 +16,64 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use serde::{Serialize, de::DeserializeOwned};
 
-/// Data resource trait for key-value storage with serializable values
-pub trait Data: Send + Sync + 'static {
-    type Filter: DeserializeOwned;
-    type ReadValue: Serialize;
-    type WriteValue: DeserializeOwned;
-    type Item;
-    type Iter: Iterator<Item = Self::Item>;
+// Re-export data types from opensovd-models
+pub use opensovd_models::data::{
+    DataCategory, DataError, DataErrorCode, DataItem,
+    StandardDataCategory, StandardDataItem, StringDataCategory, StringDataItem,
+};
 
-    /// Read a value by key
-    fn read(&self, key: &str) -> Option<Self::ReadValue>;
+/// ISO 17978-3 compliant data resource trait
+///
+/// This trait provides access to data resources within diagnostic entities.
+/// Data resources contain key-value pairs where values are JSON and items
+/// are categorized according to the ISO standard.
+pub trait DataResource: Send + Sync + 'static {
+    /// List all data items with optional filtering (string-based categories)
+    ///
+    /// # Arguments
+    /// * `categories` - Filter by data categories (empty = all categories)
+    /// * `groups` - Filter by groups (empty = all groups)
+    ///
+    /// # Returns
+    /// Vector of data item metadata matching the filters
+    fn list_data_items(&self, categories: &[StringDataCategory], groups: &[String]) -> Vec<StringDataItem>;
 
-    /// Write a value with a key
-    fn write(&mut self, key: &str, value: Self::WriteValue);
+    /// Read a specific data value
+    ///
+    /// # Arguments
+    /// * `data_id` - The ID of the data item to read
+    ///
+    /// # Returns
+    /// The data value as JSON, or a DataError if not found/accessible
+    fn read_data(&self, data_id: &str) -> Result<serde_json::Value, DataError>;
 
-    /// Query data with an optional filter, returns an iterator
-    fn query(&self, filter: Option<Self::Filter>) -> Self::Iter;
+    /// Write a specific data value
+    ///
+    /// # Arguments
+    /// * `data_id` - The ID of the data item to write
+    /// * `value` - The new value as JSON
+    ///
+    /// # Returns
+    /// Success or DataError if write failed
+    fn write_data(&mut self, data_id: &str, value: serde_json::Value) -> Result<(), DataError>;
+
+    /// Check if a data item exists
+    ///
+    /// # Arguments
+    /// * `data_id` - The ID of the data item to check
+    ///
+    /// # Returns
+    /// True if the data item exists, false otherwise
+    fn has_data_item(&self, data_id: &str) -> bool;
+
+    /// Get metadata for a specific data item
+    ///
+    /// # Arguments
+    /// * `data_id` - The ID of the data item
+    ///
+    /// # Returns
+    /// Data item metadata if found, None otherwise
+    fn get_data_item(&self, data_id: &str) -> Option<StringDataItem>;
 }
+

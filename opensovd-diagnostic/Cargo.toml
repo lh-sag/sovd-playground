@@ -6,5 +6,6 @@ license = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
+opensovd-models = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }

@@ -33,7 +33,11 @@ where
         web::scope(base_path)
             .guard(guard::Header("content-type", "application/json"))
             .configure(routes::version::configure::<T>)
-            .service(web::scope("v1").configure(routes::entity::configure)),
+            .service(
+                web::scope("v1")
+                    .configure(routes::entity::configure)
+                    .configure(routes::data::configure)
+            ),
     );
 }
 

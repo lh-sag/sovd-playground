@@ -14,13 +14,16 @@
 // under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-//
 
-pub mod diagnostic;
-pub mod entities;
-pub mod resources;
+//! SOVD data structure definitions
+//!
+//! This module contains the core data structures used in Service-Oriented Vehicle Diagnostics (SOVD)
+//! according to ISO 17978-3 standard, including support for vendor extensions.
 
-pub use diagnostic::{Diagnostic, DiagnosticBuilder};
-pub use entities::Component;
-pub use resources::{HashMapDataResource, Resource, DataItem, DataCategory, DataError};
-pub use resources::data::{DataResource, DataErrorCode};
+pub mod category;
+pub mod error;
+pub mod item;
+
+pub use category::{DataCategory, StandardDataCategory, StringDataCategory};
+pub use error::{DataError, DataErrorCode};
+pub use item::{DataItem, StandardDataItem, StringDataItem};

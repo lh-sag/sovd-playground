@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+pub(crate) mod data;
 pub(crate) mod entity;
 #[cfg(feature = "ui")]
 pub(crate) mod ui;

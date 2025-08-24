@@ -56,10 +56,19 @@ impl Component {
     ///
     /// ```rust
     /// # use opensovd_diagnostic::entities::Component;
-    /// # use opensovd_diagnostic::resources::{Resource, HashMapData};
-    /// # use opensovd_diagnostic::resources::data::Data;
-    /// let mut engine_data: HashMapData<String> = HashMapData::new();
-    /// engine_data.write("rpm", "2500".to_string());
+    /// # use opensovd_diagnostic::resources::{Resource, HashMapDataResource};
+    /// # use opensovd_models::data::StringDataCategory;
+    /// # use serde_json::json;
+    /// let mut engine_data = HashMapDataResource::new();
+    /// engine_data.add_data_item_with_metadata(
+    ///     "rpm".to_string(),
+    ///     "Engine RPM".to_string(),
+    ///     StringDataCategory::CurrentData,
+    ///     vec!["engine".to_string()],
+    ///     vec!["rpm".to_string()],
+    ///     json!({"value": 2500, "unit": "rpm"}),
+    ///     false
+    /// );
     ///
     /// let component = Component::new_with_resources(
     ///     "engine".to_string(),

@@ -16,29 +16,38 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::any::Any;
+use crate::resources::data::DataResource;
 
-/// Pure POD resource container that holds a single data resource
-#[derive(Debug)]
+/// Resource container for diagnostic resources
+/// 
+/// This container holds diagnostic resources as defined by ISO 17978-3,
+/// including data resources, fault resources, operations, etc.
 pub struct Resource {
-    pub data_resource: Option<Box<dyn Any + Send + Sync>>,
+    /// ISO-compliant data resource
+    pub data: Option<Box<dyn DataResource>>,
+}
+
+impl std::fmt::Debug for Resource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Resource")
+            .field("has_data_resource", &self.data.is_some())
+            .finish()
+    }
 }
 
 impl Resource {
     /// Creates a new empty Resource container
     pub fn new() -> Self {
-        Self { data_resource: None }
+        Self { 
+            data: None,
+        }
     }
 
-    /// Creates a new Resource container with the given data resource
-    ///
-    /// This is a convenience method for creating a Resource that already has
-    /// a data resource, avoiding the need to create the resource first and
-    /// then set the data separately.
+    /// Creates a new Resource container with the given ISO-compliant data resource
     ///
     /// # Arguments
     ///
-    /// * `data_resource` - Any type implementing the Data trait to be stored as the resource's data
+    /// * `data_resource` - A DataResource implementation to be stored
     ///
     /// # Returns
     ///
@@ -47,38 +56,37 @@ impl Resource {
     /// # Examples
     ///
     /// ```rust
-    /// # use opensovd_diagnostic::resources::{Resource, HashMapData};
-    /// # use opensovd_diagnostic::resources::data::Data;
-    /// let mut engine_data: HashMapData<String> = HashMapData::new();
-    /// engine_data.write("rpm", "2500".to_string());
-    ///
-    /// let resource = Resource::with_data_resource(engine_data);
+    /// # use opensovd_diagnostic::resources::{Resource, HashMapDataResource};
+    /// # use serde_json::json;
+    /// # use std::collections::HashMap;
+    /// let mut data_map = HashMap::new();
+    /// data_map.insert("temperature".to_string(), json!({"value": 85.5, "unit": "celsius"}));
+    /// 
+    /// let data_resource = HashMapDataResource::from_json_map(data_map);
+    /// let resource = Resource::with_data_resource(data_resource);
     ///
     /// assert!(resource.has_data_resource());
     /// ```
-    pub fn with_data_resource<T: crate::resources::data::Data + 'static>(data_resource: T) -> Self {
+    pub fn with_data_resource<T: DataResource>(data_resource: T) -> Self {
         Self {
-            data_resource: Some(Box::new(data_resource)),
+            data: Some(Box::new(data_resource)),
         }
     }
 
-    /// Get the data resource by type
-    pub fn get_data_resource<T: crate::resources::data::Data + 'static>(&self) -> Option<&T> {
-        self.data_resource
-            .as_ref()
-            .and_then(|any_box| any_box.downcast_ref::<T>())
+
+    /// Get the data resource
+    pub fn get_data_resource(&self) -> Option<&dyn DataResource> {
+        self.data.as_ref().map(|r| r.as_ref())
     }
 
-    /// Get mutable access to the data resource by type
-    pub fn get_data_resource_mut<T: crate::resources::data::Data + 'static>(&mut self) -> Option<&mut T> {
-        self.data_resource
-            .as_mut()
-            .and_then(|any_box| any_box.downcast_mut::<T>())
+    /// Get mutable access to the data resource
+    pub fn get_data_resource_mut(&mut self) -> Option<&mut dyn DataResource> {
+        self.data.as_mut().map(|r| r.as_mut())
     }
 
     /// Check if this container has a data resource
     pub fn has_data_resource(&self) -> bool {
-        self.data_resource.is_some()
+        self.data.is_some()
     }
 }
 
@@ -89,7 +97,7 @@ impl Default for Resource {
 }
 
 pub mod data;
-pub mod hashmap_data;
+pub mod hashmap_data_resource;
 
-pub use data::Data;
-pub use hashmap_data::HashMapData;
+pub use data::{DataItem, DataCategory, DataError, StandardDataCategory, StringDataCategory, StandardDataItem, StringDataItem};
+pub use hashmap_data_resource::HashMapDataResource;

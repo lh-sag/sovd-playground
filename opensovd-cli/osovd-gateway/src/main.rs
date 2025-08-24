@@ -10,14 +10,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use std::collections::HashMap;
 use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::sync::Arc;
 
 use clap::Parser;
-use opensovd_diagnostic::{Component, Diagnostic, HashMapData, Resource};
+use opensovd_diagnostic::{Component, Diagnostic, HashMapDataResource, Resource};
+use opensovd_models::data::StringDataCategory;
 use opensovd_server::{Server, ServerConfig};
 use opensovd_tracing::info;
 #[cfg(feature = "openssl")]
@@ -58,19 +58,66 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         features: ENABLED_FEATURES.iter().map(|s| s.to_string()).collect(),
     };
 
-    // Create diagnostic system with example components
-    // Add a data resource to the engine component with some diagnostic values
-    let engine_data = HashMapData::from_hashmap(HashMap::from([
-        (
-            "temperature".to_string(),
-            serde_json::json!({"value": 90.5, "unit": "celsius"}),
-        ),
-        ("rpm".to_string(), serde_json::json!({"value": 2500, "unit": "rpm"})),
-        (
-            "oil_pressure".to_string(),
-            serde_json::json!({"value": 45, "unit": "psi"}),
-        ),
-    ]));
+    // Create diagnostic system with example components using new ISO-compliant data resources
+    
+    // Create engine data resource with proper categorization
+    let mut engine_data = HashMapDataResource::new();
+    engine_data.add_data_item_with_metadata(
+        "temperature".to_string(),
+        "Engine Temperature".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["engine".to_string(), "temperature".to_string()],
+        vec!["celsius".to_string()],
+        serde_json::json!({"value": 90.5, "unit": "celsius"}),
+        false, // writable
+    );
+    engine_data.add_data_item_with_metadata(
+        "rpm".to_string(),
+        "Engine RPM".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["engine".to_string(), "performance".to_string()],
+        vec!["rpm".to_string()],
+        serde_json::json!({"value": 2500, "unit": "rpm"}),
+        false, // writable
+    );
+    engine_data.add_data_item_with_metadata(
+        "oil_pressure".to_string(),
+        "Oil Pressure".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["engine".to_string(), "fluids".to_string()],
+        vec!["pressure".to_string()],
+        serde_json::json!({"value": 45, "unit": "psi"}),
+        false, // writable
+    );
+    engine_data.add_data_item_with_metadata(
+        "serial_number".to_string(),
+        "Engine Serial Number".to_string(),
+        StringDataCategory::IdentData,
+        vec!["engine".to_string(), "identification".to_string()],
+        vec!["serial".to_string()],
+        serde_json::json!("ENG-2024-001"),
+        true, // read-only
+    );
+    
+    // Add vendor-specific engine data
+    engine_data.add_data_item_with_metadata(
+        "turbo_boost".to_string(),
+        "Turbocharger Boost Pressure".to_string(),
+        StringDataCategory::new_string_vendor("x-caterpillar-engine").unwrap(),
+        vec!["engine".to_string(), "turbo".to_string()],
+        vec!["pressure", "boost"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"value": 18.5, "unit": "psi", "max": 25.0}),
+        false, // writable
+    );
+    engine_data.add_data_item_with_metadata(
+        "def_level".to_string(),
+        "Diesel Exhaust Fluid Level".to_string(),
+        StringDataCategory::new_string_vendor("x-caterpillar-aftertreatment").unwrap(),
+        vec!["engine".to_string(), "aftertreatment".to_string()],
+        vec!["def", "fluid"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"level": 75, "unit": "percent"}),
+        false, // writable
+    );
 
     let engine_component = Component::new_with_resources(
         "engine-controller".to_string(),
@@ -78,15 +125,55 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         Resource::with_data_resource(engine_data),
     );
 
-    // Add a data resource to the transmission component
-    let transmission_data = HashMapData::from_hashmap(HashMap::from([
-        ("gear".to_string(), serde_json::json!({"current": 3, "max": 6})),
-        (
-            "fluid_temp".to_string(),
-            serde_json::json!({"value": 75, "unit": "celsius"}),
-        ),
-        ("shift_mode".to_string(), serde_json::json!("automatic")),
-    ]));
+    // Create transmission data resource with proper categorization
+    let mut transmission_data = HashMapDataResource::new();
+    transmission_data.add_data_item_with_metadata(
+        "gear".to_string(),
+        "Current Gear".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["transmission".to_string(), "gearing".to_string()],
+        vec!["gear".to_string()],
+        serde_json::json!({"current": 3, "max": 6}),
+        false, // writable
+    );
+    transmission_data.add_data_item_with_metadata(
+        "fluid_temp".to_string(),
+        "Transmission Fluid Temperature".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["transmission".to_string(), "fluids".to_string()],
+        vec!["temperature".to_string()],
+        serde_json::json!({"value": 75, "unit": "celsius"}),
+        false, // writable
+    );
+    transmission_data.add_data_item_with_metadata(
+        "shift_mode".to_string(),
+        "Shift Mode".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["transmission".to_string(), "control".to_string()],
+        vec!["mode".to_string()],
+        serde_json::json!("automatic"),
+        false, // writable
+    );
+    transmission_data.add_data_item_with_metadata(
+        "part_number".to_string(),
+        "Transmission Part Number".to_string(),
+        StringDataCategory::IdentData,
+        vec!["transmission".to_string(), "identification".to_string()],
+        vec!["part".to_string()],
+        serde_json::json!("TRANS-X900-2024"),
+        true, // read-only
+    );
+    
+    // Add vendor-specific transmission data
+    transmission_data.add_data_item_with_metadata(
+        "torque_converter_lockup".to_string(),
+        "Torque Converter Lockup Status".to_string(),
+        StringDataCategory::new_string_vendor("x-allison-transmission").unwrap(),
+        vec!["transmission".to_string(), "torque-converter".to_string()],
+        vec!["lockup", "status"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"locked": true, "slip_rpm": 25}),
+        false, // writable
+    );
 
     let transmission_component = Component::new_with_resources(
         "transmission-controller".to_string(),
@@ -94,9 +181,64 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         Resource::with_data_resource(transmission_data),
     );
 
+    // Create hydraulics system with vendor-specific categories
+    let mut hydraulics_data = HashMapDataResource::new();
+    hydraulics_data.add_data_item_with_metadata(
+        "main_pressure".to_string(),
+        "Main Hydraulic System Pressure".to_string(),
+        StringDataCategory::new_string_vendor("x-liebherr-hydraulics").unwrap(),
+        vec!["hydraulics".to_string(), "pressure".to_string()],
+        vec!["main", "system"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"value": 350, "unit": "bar", "max": 420}),
+        false, // writable
+    );
+    hydraulics_data.add_data_item_with_metadata(
+        "pilot_pressure".to_string(),
+        "Pilot Control Pressure".to_string(),
+        StringDataCategory::new_string_vendor("x-liebherr-hydraulics").unwrap(),
+        vec!["hydraulics".to_string(), "pilot".to_string()],
+        vec!["pilot", "control"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"value": 28, "unit": "bar", "target": 30}),
+        false, // writable
+    );
+    hydraulics_data.add_data_item_with_metadata(
+        "boom_position".to_string(),
+        "Boom Cylinder Position".to_string(),
+        StringDataCategory::new_string_vendor("x-liebherr-construction").unwrap(),
+        vec!["hydraulics".to_string(), "boom".to_string()],
+        vec!["position", "cylinder"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!({"extension": 65, "unit": "percent"}),
+        false, // writable
+    );
+    hydraulics_data.add_data_item_with_metadata(
+        "fluid_temperature".to_string(),
+        "Hydraulic Fluid Temperature".to_string(),
+        StringDataCategory::CurrentData,
+        vec!["hydraulics".to_string(), "fluids".to_string()],
+        vec!["temperature".to_string()],
+        serde_json::json!({"value": 45, "unit": "celsius", "warning_threshold": 80}),
+        false, // writable
+    );
+    hydraulics_data.add_data_item_with_metadata(
+        "pump_model".to_string(),
+        "Hydraulic Pump Model".to_string(),
+        StringDataCategory::IdentData,
+        vec!["hydraulics".to_string(), "pump".to_string()],
+        vec!["model", "identification"].iter().map(|s| s.to_string()).collect(),
+        serde_json::json!("LH-PUMP-350-V2"),
+        true, // read-only
+    );
+    
+    let hydraulics_component = Component::new_with_resources(
+        "hydraulics-controller".to_string(),
+        "Hydraulic Control System".to_string(),
+        Resource::with_data_resource(hydraulics_data),
+    );
+
     let diagnostic = Diagnostic::builder()
         .add_component(engine_component)
         .add_component(transmission_component)
+        .add_component(hydraulics_component)
         .build();
 
     let mut config_builder = ServerConfig::builder_with_vendor_type::<OpenSovdInfo>()
