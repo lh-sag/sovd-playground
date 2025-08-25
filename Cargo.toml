@@ -4,7 +4,6 @@ members = [
     "opensovd-client",
     "opensovd-server",
     "opensovd-cli",
-    "opensovd-tracing",
     "opensovd-diagnostic",
 ]
 resolver = "2"
@@ -25,7 +24,6 @@ opensovd-diagnostic = { version = "0.0.1", path = "opensovd-diagnostic" }
 
 opensovd-client = { version = "0.0.1", path = "opensovd-client" }
 opensovd-server = { version = "0.0.1", path = "opensovd-server" }
-opensovd-tracing = { version = "0.0.1", path = "opensovd-tracing" }
 
 serde = { version = "1.0.219", default-features = false, features = [
     "derive",
@@ -37,6 +35,7 @@ serde_json = { version = "1.0.133", default-features = false, features = [
 clap = { version = "4.5.42", default-features = false, features = [
     "cargo",
     "derive",
+    "env",
     "help",
     "std",
     "usage",
@@ -58,8 +57,8 @@ tracing-subscriber = { version = "0.3.19", features = [
     "alloc",
     "fmt",
 ], default-features = false }
-tracing-log = { version = "0.2.0", default-features = false }
-log = { version = "0.4", default-features = false }
+tracing-log = { version = "0.2.0", default-features = false, features = ["log-tracer"] }
+log = { version = "0.4", default-features = false, features = ["std"] }
 openssl = { version = "0.10.73", default-features = false }
 futures-core = { version = "0.3.31", default-features = false, features = [
     "alloc",
@@ -75,6 +74,13 @@ url = { version = "2.5", default-features = false }
 urlencoding = { version = "2.1", default-features = false }
 hyper-openssl = { version = "0.10", default-features = false }
 tokio-openssl = { version = "0.6", default-features = false }
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+once_cell = { version = "1.19", default-features = false, features = ["std"] }
+prometheus = { version = "0.13", default-features = false }
+opentelemetry = { version = "0.24", default-features = false, features = ["metrics", "trace"] }
+opentelemetry_sdk = { version = "0.24", default-features = false, features = ["metrics", "rt-tokio"] }
+opentelemetry-prometheus = { version = "0.17", default-features = false }
+opentelemetry-otlp = { version = "0.17", default-features = false, features = ["metrics", "grpc-tonic", "tonic"] }
 
 [profile.release]
 codegen-units = 1

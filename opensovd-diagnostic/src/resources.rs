@@ -16,15 +16,67 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
 use crate::resources::data::DataResource;
 
+/// Generic lockable wrapper for resources with optional metrics
+pub struct Lockable<T> {
+    inner: Arc<RwLock<T>>,
+    #[cfg(feature = "metrics")]
+    resource_type: &'static str,
+}
+
+impl<T> Lockable<T> {
+    pub fn new(value: T) -> Self {
+        Self::new_with_type(value, "unknown")
+    }
+    
+    pub fn new_with_type(value: T, #[allow(unused_variables)] resource_type: &'static str) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(value)),
+            #[cfg(feature = "metrics")]
+            resource_type,
+        }
+    }
+    
+    pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, T> {
+        #[cfg(feature = "metrics")]
+        {
+            let _timer = crate::metrics::record_lock_acquisition(self.resource_type, "read");
+        }
+        
+        self.inner.read().await
+    }
+    
+    pub async fn write(&self) -> tokio::sync::RwLockWriteGuard<'_, T> {
+        #[cfg(feature = "metrics")]
+        {
+            let _timer = crate::metrics::record_lock_acquisition(self.resource_type, "write");
+        }
+        
+        self.inner.write().await
+    }
+}
+
+impl<T> Clone for Lockable<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            #[cfg(feature = "metrics")]
+            resource_type: self.resource_type,
+        }
+    }
+}
+
 /// Resource container for diagnostic resources
-/// 
+///
 /// This container holds diagnostic resources as defined by ISO 17978-3,
 /// including data resources, fault resources, operations, etc.
 pub struct Resource {
-    /// ISO-compliant data resource
-    pub data: Option<Box<dyn DataResource>>,
+    /// ISO-compliant data resource with fine-grained locking
+    pub data: Option<Lockable<Box<dyn DataResource>>>,
 }
 
 impl std::fmt::Debug for Resource {
@@ -38,9 +90,7 @@ impl std::fmt::Debug for Resource {
 impl Resource {
     /// Creates a new empty Resource container
     pub fn new() -> Self {
-        Self { 
-            data: None,
-        }
+        Self { data: None }
     }
 
     /// Creates a new Resource container with the given ISO-compliant data resource
@@ -56,32 +106,30 @@ impl Resource {
     /// # Examples
     ///
     /// ```rust
-    /// # use opensovd_diagnostic::resources::{Resource, HashMapDataResource};
-    /// # use serde_json::json;
-    /// # use std::collections::HashMap;
-    /// let mut data_map = HashMap::new();
-    /// data_map.insert("temperature".to_string(), json!({"value": 85.5, "unit": "celsius"}));
-    /// 
-    /// let data_resource = HashMapDataResource::from_json_map(data_map);
+    /// # use opensovd_diagnostic::resources::Resource;
+    /// # use opensovd_diagnostic::resources::data::{DataResource, DataItem, DataError};
+    /// # struct DummyDataResource;
+    /// # impl DataResource for DummyDataResource {
+    /// #     fn list_data_items(&self, _: &[String], _: &[String]) -> Vec<DataItem> { vec![] }
+    /// #     fn read_data(&self, _: &str) -> Result<serde_json::Value, DataError> { todo!() }
+    /// #     fn write_data(&mut self, _: &str, _: serde_json::Value) -> Result<(), DataError> { todo!() }
+    /// #     fn has_data_item(&self, _: &str) -> bool { false }
+    /// #     fn get_data_item(&self, _: &str) -> Option<DataItem> { None }
+    /// # }
+    /// let data_resource = DummyDataResource;
     /// let resource = Resource::with_data_resource(data_resource);
     ///
     /// assert!(resource.has_data_resource());
     /// ```
-    pub fn with_data_resource<T: DataResource>(data_resource: T) -> Self {
+    pub fn with_data_resource(data_resource: Box<dyn DataResource>) -> Self {
         Self {
-            data: Some(Box::new(data_resource)),
+            data: Some(Lockable::new_with_type(data_resource, "data")),
         }
     }
 
-
-    /// Get the data resource
-    pub fn get_data_resource(&self) -> Option<&dyn DataResource> {
-        self.data.as_ref().map(|r| r.as_ref())
-    }
-
-    /// Get mutable access to the data resource
-    pub fn get_data_resource_mut(&mut self) -> Option<&mut dyn DataResource> {
-        self.data.as_mut().map(|r| r.as_mut())
+    /// Get the lockable data resource
+    pub fn get_data_resource(&self) -> Option<&Lockable<Box<dyn DataResource>>> {
+        self.data.as_ref()
     }
 
     /// Check if this container has a data resource
@@ -97,7 +145,5 @@ impl Default for Resource {
 }
 
 pub mod data;
-pub mod hashmap_data_resource;
 
-pub use data::{DataItem, DataCategory, DataError, StandardDataCategory, StringDataCategory, StandardDataItem, StringDataItem};
-pub use hashmap_data_resource::HashMapDataResource;
+pub use data::{DataError, DataItem};

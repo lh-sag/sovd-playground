@@ -16,12 +16,46 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+/// Simplified data error for diagnostic operations
+///
+/// This error type includes common error cases needed
+/// for data resource operations.
+#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
+pub enum DataError {
+    /// Data item not found with the given ID
+    #[display("Data item not found: {}", _0)]
+    DataNotFound(#[error(ignore)] String),
+    /// Data item is read-only and cannot be written
+    #[display("Data item is read-only: {}", _0)]
+    ReadOnly(#[error(ignore)] String),
+    /// Access denied to the data item
+    #[display("Access denied: {}", _0)]
+    AccessDenied(#[error(ignore)] String),
+    /// Invalid data format or type
+    #[display("Invalid data: {}", _0)]
+    InvalidData(#[error(ignore)] String),
+    /// Internal error occurred
+    #[display("Internal error: {}", _0)]
+    InternalError(#[error(ignore)] String),
+}
 
-// Re-export data types from opensovd-models
-pub use opensovd_models::data::{
-    DataCategory, DataError, DataErrorCode, DataItem,
-    StandardDataCategory, StandardDataItem, StringDataCategory, StringDataItem,
-};
+/// Data item metadata for list operations
+///
+/// This struct contains the essential metadata fields needed for listing
+/// and filtering data items within a data resource.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataItem {
+    /// Unique identifier for the data item
+    pub id: String,
+    /// Human-readable name of the data item
+    pub name: String,
+    /// Category classification as a string
+    pub category: String,
+    /// Groups this data item belongs to
+    pub groups: Vec<String>,
+    /// Tags for additional classification
+    pub tags: Vec<String>,
+}
 
 /// ISO 17978-3 compliant data resource trait
 ///
@@ -37,7 +71,7 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// Vector of data item metadata matching the filters
-    fn list_data_items(&self, categories: &[StringDataCategory], groups: &[String]) -> Vec<StringDataItem>;
+    fn list_data_items(&self, categories: &[String], groups: &[String]) -> Vec<DataItem>;
 
     /// Read a specific data value
     ///
@@ -74,6 +108,5 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// Data item metadata if found, None otherwise
-    fn get_data_item(&self, data_id: &str) -> Option<StringDataItem>;
+    fn get_data_item(&self, data_id: &str) -> Option<DataItem>;
 }
-

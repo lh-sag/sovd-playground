@@ -24,6 +24,6 @@ pub mod category;
 pub mod error;
 pub mod item;
 
-pub use category::{DataCategory, StandardDataCategory, StringDataCategory};
+pub use category::DataCategory;
 pub use error::{DataError, DataErrorCode};
-pub use item::{DataItem, StandardDataItem, StringDataItem};
+pub use item::DataItem;

@@ -3,454 +3,20 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';"
+        />
         <title>OpenSOVD</title>
 
-        <!-- Bootstrap CSS -->
-        <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-            rel="stylesheet"
-        />
+        <!-- Bootstrap CSS (local) -->
+        <link href="./css/bootstrap.min.css" rel="stylesheet" />
 
-        <!-- Bootstrap Icons -->
-        <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-            rel="stylesheet"
-        />
+        <!-- Bootstrap Icons (local) -->
+        <link href="./css/bootstrap-icons.css" rel="stylesheet" />
 
-        <!-- Vue.js 3 -->
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-
-        <style>
-            :root {
-                /* Light theme variables */
-                --bg-primary: #ffffff;
-                --bg-secondary: #f8f9fa;
-                --bg-sidebar: #f8f9fa;
-                --bg-topbar: #343a40;
-                --bg-selected: #ffcc00;
-                --bg-hover: rgba(255, 204, 0, 0.3);
-                --text-primary: #212529;
-                --text-secondary: #6c757d;
-                --text-muted: #adb5bd;
-                --text-hover: #000000;
-                --border-color: #dee2e6;
-                --border-dark: #495057;
-                --accent-color: #ffcc00;
-            }
-
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    /* Dark theme variables */
-                    --bg-primary: #1e1e1e;
-                    --bg-secondary: #2d2d30;
-                    --bg-sidebar: #252526;
-                    --bg-topbar: #1e1e1e;
-                    --bg-selected: #ffcc00;
-                    --bg-hover: rgba(255, 204, 0, 0.4);
-                    --text-primary: #cccccc;
-                    --text-secondary: #9d9d9d;
-                    --text-muted: #6d6d6d;
-                    --text-hover: #000000;
-                    --border-color: #3e3e42;
-                    --border-dark: #5a5a5a;
-                    --accent-color: #ffcc00;
-                }
-            }
-
-            html,
-            body {
-                height: 100%;
-                margin: 0;
-                padding: 0;
-                background-color: var(--bg-primary);
-                color: var(--text-primary);
-                transition:
-                    background-color 0.2s ease,
-                    color 0.2s ease;
-            }
-
-            #app {
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .topbar {
-                background-color: var(--bg-topbar);
-                color: var(--text-primary);
-                padding: 0.5rem;
-                border-bottom: 1px solid var(--border-color);
-            }
-
-            .content {
-                flex: 1;
-                display: flex;
-                overflow: hidden;
-            }
-
-            .sidebar {
-                width: 280px;
-                background-color: var(--bg-sidebar);
-                border-right: 1px solid var(--border-color);
-                overflow-y: auto;
-                padding: 0.75rem;
-                position: relative;
-            }
-
-            .main-panel {
-                flex: 1;
-                padding: 1.5rem;
-                overflow-y: auto;
-                background-color: var(--bg-primary);
-            }
-
-            .component-tree {
-                list-style: none;
-                padding-left: 0;
-            }
-
-            .component-item {
-                user-select: none;
-            }
-
-            .component-header {
-                padding: 0.35rem 0.5rem;
-                margin: 0.15rem 0;
-                cursor: pointer;
-                border-radius: 4px;
-                transition:
-                    background-color 0.2s,
-                    color 0.2s;
-                display: flex;
-                align-items: center;
-                font-size: 0.9rem;
-            }
-
-            .component-header:hover {
-                background-color: var(--bg-hover);
-                color: var(--text-hover);
-            }
-
-            .component-header.selected {
-                background-color: var(--bg-selected);
-                color: #000000;
-            }
-
-            .component-header i {
-                margin-right: 0.35rem;
-                transition: transform 0.2s;
-                font-size: 0.85rem;
-            }
-
-            .component-header .expand-icon {
-                margin-right: 0.2rem;
-                font-size: 0.65rem;
-                transition: transform 0.2s;
-            }
-
-            .component-header .expand-icon.expanded {
-                transform: rotate(90deg);
-            }
-
-            .resource-list {
-                list-style: none;
-                padding-left: 1.5rem;
-                margin: 0;
-            }
-
-            .resource-item {
-                padding: 0.25rem 0.4rem;
-                margin: 0.1rem 0;
-                cursor: pointer;
-                border-radius: 4px;
-                transition:
-                    background-color 0.2s,
-                    color 0.2s;
-                display: flex;
-                align-items: center;
-                color: var(--text-secondary);
-                font-size: 0.85rem;
-            }
-
-            .resource-item:hover {
-                background-color: var(--bg-hover);
-                color: var(--text-hover);
-            }
-
-            .resource-item.selected {
-                background-color: var(--bg-selected);
-                color: #000000;
-            }
-
-            .resource-item i {
-                margin-right: 0.35rem;
-                font-size: 0.8rem;
-            }
-
-            .empty-state {
-                text-align: center;
-                color: var(--text-secondary);
-                margin: 2rem 0;
-            }
-
-            .spinner-border {
-                width: 1rem;
-                height: 1rem;
-                border-width: 0.15em;
-            }
-
-            .info-card {
-                background-color: var(--bg-secondary);
-                border-left: 3px solid var(--accent-color);
-                padding: 1rem;
-                border-radius: 4px;
-                margin-bottom: 1rem;
-            }
-
-            .info-row {
-                display: flex;
-                margin-bottom: 0.5rem;
-            }
-
-            .info-label {
-                font-weight: 600;
-                color: var(--text-secondary);
-                min-width: 120px;
-            }
-
-            .info-value {
-                color: var(--text-primary);
-                word-break: break-all;
-            }
-
-            @media (prefers-color-scheme: dark) {
-                .form-control {
-                    background-color: var(--bg-secondary);
-                    color: var(--text-primary);
-                    border-color: var(--border-color);
-                }
-
-                .form-control:focus {
-                    background-color: var(--bg-secondary);
-                    color: var(--text-primary);
-                    border-color: var(--accent-color);
-                    box-shadow: 0 0 0 0.2rem rgba(255, 204, 0, 0.25);
-                }
-
-                .form-control::placeholder {
-                    color: var(--text-muted);
-                    opacity: 1;
-                }
-
-                .alert-info {
-                    background-color: var(--bg-secondary);
-                    border-color: var(--border-color);
-                    color: var(--text-primary);
-                }
-            }
-
-            .server-banner {
-                background-color: var(--bg-secondary);
-                border: 1px solid var(--border-color);
-                border-radius: 4px;
-                padding: 0.5rem;
-                margin-bottom: 0.5rem;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                font-size: 0.85rem;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                position: relative;
-            }
-
-            .server-banner {
-                cursor: pointer;
-                transition:
-                    background-color 0.2s ease,
-                    color 0.2s ease;
-            }
-
-            .server-banner:hover {
-                background-color: var(--bg-hover);
-                color: var(--text-hover);
-            }
-
-            .version-pane {
-                position: fixed;
-                top: auto;
-                left: auto;
-                width: 320px;
-                max-height: none;
-                background-color: var(--bg-primary);
-                border: 1px solid var(--border-color);
-                border-radius: 6px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 1000;
-                overflow: visible;
-                opacity: 0;
-                visibility: hidden;
-                transform: translateY(-10px);
-                transition: all 0.2s ease;
-            }
-
-            .version-pane.open {
-                opacity: 1;
-                visibility: visible;
-                transform: translateY(0);
-            }
-
-            .version-pane-content {
-                padding: 0;
-            }
-
-            .list-group-item {
-                background-color: var(--bg-primary);
-                border-color: var(--border-color);
-                color: var(--text-primary);
-            }
-
-            .list-group-item:hover {
-                background-color: var(--bg-hover);
-                border-color: var(--accent-color);
-                color: var(--text-hover);
-            }
-
-            .list-group-item.active,
-            .list-group-item.active.list-group-item-action,
-            .list-group-item.list-group-item-action.active,
-            .list-group-item-action.active {
-                background-color: var(--bg-selected) !important;
-                border-color: var(--accent-color) !important;
-                color: #000000 !important;
-            }
-
-            /* Ensure active items stay dark even on hover */
-            .list-group-item.active:hover,
-            .list-group-item.active.list-group-item-action:hover,
-            .list-group-item.list-group-item-action.active:hover,
-            .list-group-item-action.active:hover {
-                background-color: var(--bg-selected) !important;
-                border-color: var(--accent-color) !important;
-                color: #000000 !important;
-            }
-
-            /* Override Bootstrap's default active state */
-            .list-group-item-action.active,
-            .list-group-item-action.active:hover,
-            .list-group-item-action.active:focus {
-                color: #000000 !important;
-                background-color: var(--bg-selected) !important;
-            }
-
-            /* Ensure all text within active items is dark */
-            .list-group-item.active .version-title,
-            .list-group-item.active .version-uri,
-            .list-group-item.active .vendor-info,
-            .list-group-item.active .vendor-key,
-            .list-group-item.active .vendor-value,
-            .list-group-item.active .vendor-info-item,
-            .list-group-item-action.active .version-title,
-            .list-group-item-action.active .version-uri,
-            .list-group-item-action.active .vendor-info,
-            .list-group-item-action.active .vendor-key,
-            .list-group-item-action.active .vendor-value,
-            .list-group-item-action.active .vendor-info-item {
-                color: #000000 !important;
-            }
-
-            /* Catch-all rule: ensure ALL child elements within active items have dark text */
-            .list-group-item.active *,
-            .list-group-item-action.active * {
-                color: #000000 !important;
-            }
-
-            .version-title {
-                font-weight: 600;
-                font-size: 0.9rem;
-                margin-bottom: 0.25rem;
-            }
-
-            .version-uri {
-                font-family: monospace;
-                font-size: 0.75rem;
-                color: var(--text-secondary);
-                margin-bottom: 0.25rem;
-            }
-
-            .vendor-info {
-                font-size: 0.75rem;
-            }
-
-            .vendor-info-item {
-                display: flex;
-                justify-content: space-between;
-                margin: 0.15rem 0;
-                padding: 0.1rem 0;
-                border-bottom: 1px dotted var(--border-color);
-            }
-
-            .vendor-key {
-                font-weight: 500;
-                color: var(--text-secondary);
-            }
-
-            .vendor-value {
-                color: var(--text-primary);
-                text-align: right;
-            }
-
-            /* Breadcrumb styling */
-            .breadcrumb {
-                background-color: var(--bg-secondary);
-                border: 1px solid var(--border-color);
-                border-radius: 4px;
-                padding: 0.5rem 0.75rem;
-                margin: 0;
-                font-size: 0.9rem;
-            }
-
-            .breadcrumb-item + .breadcrumb-item::before {
-                content: ">";
-                color: var(--text-muted);
-            }
-
-            .breadcrumb-item a:hover {
-                color: var(--text-primary) !important;
-                text-decoration: underline !important;
-            }
-
-            .breadcrumb-item.active {
-                font-weight: 500;
-            }
-
-            .breadcrumb-item i {
-                margin-right: 0.25rem;
-                font-size: 0.85rem;
-            }
-
-            /* Table theming - override Bootstrap defaults */
-            .table {
-                --bs-table-bg: var(--bg-primary) !important;
-                --bs-table-color: var(--text-primary) !important;
-                --bs-table-border-color: var(--border-color) !important;
-            }
-
-            .table th {
-                background-color: var(--bg-secondary) !important;
-                color: var(--text-primary) !important;
-                border-color: var(--border-color) !important;
-            }
-
-            .table td {
-                background-color: var(--bg-primary) !important;
-                color: var(--text-primary) !important;
-                border-color: var(--border-color) !important;
-            }
-
-            .table tbody tr {
-                background-color: var(--bg-primary) !important;
-            }
-        </style>
+        <!-- Application CSS -->
+        <link href="./css/app.css" rel="stylesheet" />
     </head>
     <body>
         <div id="app">
@@ -476,44 +42,47 @@
                     >
                         <div>
                             <i class="bi bi-hdd-network"></i>
-                            {{ serverUrl || window.location.host }}
+                            <span
+                                v-text="serverUrl || window.location.host"
+                            ></span>
                         </div>
                         <div>
-                            <span v-if="currentVersion"
-                                >v{{ currentVersion.version }}</span
-                            >
+                            <span
+                                v-if="currentVersion"
+                                v-text="'v' + currentVersion.version"
+                            ></span>
                             <i
-                                class="bi bi-chevron-right"
-                                style="margin-left: 0.5rem; font-size: 0.8rem"
+                                class="bi bi-chevron-right ms-2"
+                                style="font-size: 0.8rem"
                             ></i>
                         </div>
                     </div>
-                    <h6 class="mb-2" style="font-size: 0.95rem">
+                    <h6 class="mb-2 sidebar-title">
                         <i class="bi bi-diagram-3"></i> Components
                     </h6>
                     <div class="mb-2">
                         <input
                             type="text"
                             v-model="filterText"
-                            class="form-control form-control-sm"
+                            @input="onFilterInput"
+                            class="form-control form-control-sm filter-input"
                             placeholder="Filter components..."
-                            style="
-                                font-size: 0.85rem;
-                                background-color: var(--bg-primary);
-                                color: var(--text-primary);
-                                border-color: var(--border-color);
-                            "
+                            maxlength="100"
                         />
                     </div>
-                    <div v-if="loadingComponents" class="text-center py-3">
+
+                    <!-- Loading skeleton for components -->
+                    <div v-if="loadingComponents">
                         <div
-                            class="spinner-border"
-                            role="status"
-                            style="color: var(--accent-color)"
+                            v-for="i in 5"
+                            :key="'skeleton-' + i"
+                            class="skeleton skeleton-tree-item"
                         >
-                            <span class="visually-hidden">Loading...</span>
+                            <div class="skeleton skeleton-tree-icon"></div>
+                            <div class="skeleton skeleton-tree-text"></div>
                         </div>
                     </div>
+
                     <ul
                         v-else-if="components.length > 0"
                         class="component-tree"
@@ -525,36 +94,52 @@
                         >
                             <div
                                 class="component-header"
-                                :class="{ selected: selectedItem && selectedItem.type === 'component' && selectedItem.id === component.id }"
+                                :class="{
+                                    selected: selectedItem && selectedItem.type === 'component' && selectedItem.id === component.id,
+                                    'keyboard-focused': isFocused(filteredComponents.indexOf(component), -1)
+                                }"
+                                :data-component-id="component.id"
                                 @click="selectComponent(component)"
+                                tabindex="0"
+                                role="treeitem"
+                                :aria-expanded="expandedComponents[component.id] ? 'true' : 'false'"
+                                :aria-selected="selectedItem && selectedItem.type === 'component' && selectedItem.id === component.id"
                             >
                                 <i
                                     v-if="component.resources && component.resources.length > 0"
                                     class="bi bi-caret-right-fill expand-icon"
                                     :class="{ expanded: expandedComponents[component.id] }"
                                 ></i>
-                                <span
-                                    v-else
-                                    style="width: 1rem; display: inline-block"
-                                ></span>
+                                <span v-else class="expand-spacer"></span>
                                 <i class="bi bi-box"></i>
-                                {{ component.name || component.id }}
+                                <span
+                                    v-text="component.name || component.id"
+                                ></span>
                             </div>
                             <ul
                                 v-if="expandedComponents[component.id] && component.resources"
                                 class="resource-list"
                             >
                                 <li
-                                    v-for="resource in component.resources"
+                                    v-for="(resource, rIndex) in component.resources"
                                     :key="resource.key"
                                     class="resource-item"
-                                    :class="{ selected: selectedItem && selectedItem.type === 'resource' && selectedItem.key === resource.key && selectedItem.componentId === component.id }"
+                                    :class="{
+                                        selected: selectedItem && selectedItem.type === 'resource' && selectedItem.key === resource.key && selectedItem.componentId === component.id,
+                                        'keyboard-focused': isFocused(filteredComponents.indexOf(component), rIndex)
+                                    }"
+                                    :data-resource-id="`${component.id}-${rIndex}`"
                                     @click.stop="selectResource(component, resource)"
+                                    tabindex="-1"
+                                    role="treeitem"
+                                    :aria-selected="selectedItem && selectedItem.type === 'resource' && selectedItem.key === resource.key && selectedItem.componentId === component.id"
                                 >
                                     <i
                                         :class="getResourceIcon(resource.key)"
                                     ></i>
-                                    {{ formatResourceName(resource.key) }}
+                                    <span
+                                        v-text="formatResourceName(resource.key)"
+                                    ></span>
                                 </li>
                             </ul>
                         </li>
@@ -568,32 +153,51 @@
                 <!-- Main panel -->
                 <div class="main-panel">
                     <!-- Breadcrumb Navigation -->
-                    <nav v-if="selectedItem" aria-label="breadcrumb" class="mb-3" style="margin: -1.5rem -1.5rem 1rem -1.5rem;">
+                    <nav
+                        v-if="selectedItem"
+                        aria-label="breadcrumb"
+                        class="mb-3 breadcrumb-wrapper"
+                    >
                         <ol class="breadcrumb">
                             <li class="breadcrumb-item">
-                                <a href="#" @click.prevent="clearSelection()" style="color: var(--text-secondary); text-decoration: none;">
+                                <a
+                                    href="#"
+                                    @click.prevent="clearSelection()"
+                                    class="breadcrumb-link"
+                                >
                                     <i class="bi bi-diagram-3"></i>
                                     Components
                                 </a>
                             </li>
                             <li class="breadcrumb-item">
-                                <a href="#" @click.prevent="selectComponentFromBreadcrumb()" style="color: var(--text-secondary); text-decoration: none;">
+                                <a
+                                    href="#"
+                                    @click.prevent="selectComponentFromBreadcrumb()"
+                                    class="breadcrumb-link"
+                                >
                                     <i class="bi bi-box"></i>
-                                    {{ selectedItem.name || selectedItem.componentName || selectedItem.id }}
+                                    <span
+                                        v-text="selectedItem.name || selectedItem.componentName || selectedItem.id"
+                                    ></span>
                                 </a>
                             </li>
-                            <li v-if="selectedItem.type === 'resource'" class="breadcrumb-item active" aria-current="page" style="color: var(--text-primary);">
-                                <i :class="getResourceIcon(selectedItem.key)"></i>
-                                {{ formatResourceName(selectedItem.key) }}
+                            <li
+                                v-if="selectedItem.type === 'resource'"
+                                class="breadcrumb-item active"
+                                aria-current="page"
+                            >
+                                <i
+                                    :class="getResourceIcon(selectedItem.key)"
+                                ></i>
+                                <span
+                                    v-text="formatResourceName(selectedItem.key)"
+                                ></span>
                             </li>
                         </ol>
                     </nav>
 
                     <div v-if="!selectedItem" class="empty-state">
-                        <i
-                            class="bi bi-arrow-left-circle"
-                            style="font-size: 3rem"
-                        ></i>
+                        <i class="bi bi-arrow-left-circle empty-state-icon"></i>
                         <h5 class="mt-3">Select a component or resource</h5>
                         <p>
                             Choose a component from the left panel to view its
@@ -601,16 +205,10 @@
                         </p>
                     </div>
 
-                    <div v-else-if="loadingDetails" class="text-center py-5">
-                        <div
-                            class="spinner-border"
-                            role="status"
-                            style="color: var(--accent-color)"
-                        >
-                            <span class="visually-hidden"
-                                >Loading details...</span
-                            >
-                        </div>
+                    <!-- Loading skeleton for details -->
+                    <div v-else-if="loadingDetails">
+                        <div class="skeleton skeleton-card"></div>
+                        <div class="skeleton skeleton-card"></div>
                     </div>
 
                     <div
@@ -620,24 +218,27 @@
                             <h6 class="mb-3">Component Information</h6>
                             <div class="info-row">
                                 <span class="info-label">ID:</span>
-                                <span class="info-value"
-                                    >{{ componentDetails.id }}</span
-                                >
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.id"
+                                ></span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Name:</span>
-                                <span class="info-value"
-                                    >{{ componentDetails.name || 'N/A' }}</span
-                                >
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.name || 'N/A'"
+                                ></span>
                             </div>
                             <div
                                 v-if="componentDetails.translation_id"
                                 class="info-row"
                             >
                                 <span class="info-label">Translation ID:</span>
-                                <span class="info-value"
-                                    >{{ componentDetails.translation_id }}</span
-                                >
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.translation_id"
+                                ></span>
                             </div>
 
                             <!-- Display component extensions if present -->
@@ -648,12 +249,14 @@
                                     :key="key"
                                     class="info-row"
                                 >
-                                    <span class="info-label"
-                                        >{{ formatExtensionKey(key) }}:</span
-                                    >
-                                    <span class="info-value"
-                                        >{{ formatExtensionValue(value) }}</span
-                                    >
+                                    <span
+                                        class="info-label"
+                                        v-text="formatExtensionKey(key) + ':'"
+                                    ></span>
+                                    <span
+                                        class="info-value"
+                                        v-text="formatExtensionValue(value)"
+                                    ></span>
                                 </div>
                             </div>
                         </div>
@@ -677,7 +280,9 @@
                                         :class="getResourceIcon(key)"
                                         class="me-2"
                                     ></i>
-                                    {{ formatResourceName(key) }}
+                                    <span
+                                        v-text="formatResourceName(key)"
+                                    ></span>
                                 </li>
                             </ul>
 
@@ -693,8 +298,9 @@
                                     class="ms-3"
                                     style="font-size: 0.9rem"
                                 >
-                                    {{ formatExtensionKey(key) }}: {{
-                                    formatExtensionValue(value) }}
+                                    <span
+                                        v-text="formatExtensionKey(key) + ': ' + formatExtensionValue(value)"
+                                    ></span>
                                 </div>
                             </div>
                         </div>
@@ -709,46 +315,88 @@
                         <!-- Resource Data Display -->
                         <div v-if="resourceData" class="info-card">
                             <h6 class="mb-3">Resource Data</h6>
-                            
+
                             <!-- For data resources with items array -->
-                            <div v-if="resourceData.items && Array.isArray(resourceData.items)">
-                                <div v-if="resourceData.items.length === 0" class="alert alert-info">
+                            <div
+                                v-if="resourceData.items && Array.isArray(resourceData.items)"
+                            >
+                                <div
+                                    v-if="resourceData.items.length === 0"
+                                    class="alert alert-info"
+                                >
                                     <i class="bi bi-info-circle"></i>
                                     No data items available in this resource.
                                 </div>
                                 <div v-else>
                                     <div class="table-responsive">
-                                        <table class="table table-sm" style="color: var(--text-primary); background-color: var(--bg-primary); border-color: var(--border-color);">
-                                            <thead style="background-color: var(--bg-secondary);">
+                                        <table
+                                            class="table table-sm data-table"
+                                        >
+                                            <thead>
                                                 <tr>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">ID</th>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Name</th>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Category</th>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Groups</th>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Tags</th>
-                                                    <th style="color: var(--text-primary); border-color: var(--border-color);">Read Only</th>
+                                                    <th>ID</th>
+                                                    <th>Name</th>
+                                                    <th>Category</th>
+                                                    <th>Groups</th>
+                                                    <th>Tags</th>
+                                                    <th>Read Only</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr v-for="item in resourceData.items" :key="item.id" style="background-color: var(--bg-primary);">
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);"><code style="font-size: 0.8rem; color: var(--text-primary); background-color: var(--bg-secondary); padding: 0.2rem 0.3rem; border-radius: 3px;">{{ item.id }}</code></td>
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">{{ item.name || 'N/A' }}</td>
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);"><span class="badge" style="background-color: var(--accent-color); color: #000;">{{ item.category }}</span></td>
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
-                                                        <span v-for="group in (item.groups || [])" :key="group" class="badge me-1" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color);">
-                                                            {{ group }}
-                                                        </span>
-                                                        <span v-if="!item.groups || item.groups.length === 0" style="color: var(--text-muted);">None</span>
+                                                <tr
+                                                    v-for="item in resourceData.items"
+                                                    :key="item.id"
+                                                >
+                                                    <td class="data-table-cell">
+                                                        <code
+                                                            class="code-inline"
+                                                            v-text="item.id"
+                                                        ></code>
                                                     </td>
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
-                                                        <span v-for="tag in (item.tags || [])" :key="tag" class="badge me-1" style="background-color: var(--text-secondary); color: var(--bg-primary);">
-                                                            {{ tag }}
-                                                        </span>
-                                                        <span v-if="!item.tags || item.tags.length === 0" style="color: var(--text-muted);">None</span>
+                                                    <td
+                                                        class="data-table-cell"
+                                                        v-text="item.name || 'N/A'"
+                                                    ></td>
+                                                    <td class="data-table-cell">
+                                                        <span
+                                                            class="badge badge-category"
+                                                            v-text="item.category"
+                                                        ></span>
                                                     </td>
-                                                    <td style="color: var(--text-primary); border-color: var(--border-color);">
-                                                        <i :class="item.read_only ? 'bi bi-lock' : 'bi bi-unlock'" :style="item.read_only ? 'color: var(--accent-color);' : 'color: #28a745;'"></i>
-                                                        {{ item.read_only ? 'Yes' : 'No' }}
+                                                    <td class="data-table-cell">
+                                                        <span
+                                                            v-for="group in (item.groups || [])"
+                                                            :key="group"
+                                                            class="badge badge-group me-1"
+                                                            v-text="group"
+                                                        ></span>
+                                                        <span
+                                                            v-if="!item.groups || item.groups.length === 0"
+                                                            class="text-none"
+                                                            >None</span
+                                                        >
+                                                    </td>
+                                                    <td class="data-table-cell">
+                                                        <span
+                                                            v-for="tag in (item.tags || [])"
+                                                            :key="tag"
+                                                            class="badge badge-tag me-1"
+                                                            v-text="tag"
+                                                        ></span>
+                                                        <span
+                                                            v-if="!item.tags || item.tags.length === 0"
+                                                            class="text-none"
+                                                            >None</span
+                                                        >
+                                                    </td>
+                                                    <td class="data-table-cell">
+                                                        <i
+                                                            class="icon-status"
+                                                            :class="item.read_only ? 'bi bi-lock locked' : 'bi bi-unlock unlocked'"
+                                                        ></i>
+                                                        <span
+                                                            v-text="item.read_only ? 'Yes' : 'No'"
+                                                        ></span>
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -756,14 +404,19 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- For other resource types, display as JSON -->
                             <div v-else>
-                                <pre style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 4px; color: var(--text-primary); font-size: 0.85rem; max-height: 400px; overflow-y: auto;"><code>{{ JSON.stringify(resourceData, null, 2) }}</code></pre>
+                                <pre
+                                    class="code-display"
+                                ><code v-text="JSON.stringify(resourceData, null, 2)"></code></pre>
                             </div>
                         </div>
 
-                        <div v-else-if="!loadingDetails" class="alert alert-info">
+                        <div
+                            v-else-if="!loadingDetails"
+                            class="alert alert-info"
+                        >
                             <i class="bi bi-info-circle"></i>
                             No data available for this resource.
                         </div>
@@ -786,12 +439,14 @@
                                 :class="{ active: selectedVersion === version.base_uri }"
                                 @click="selectVersionFromPane(version)"
                             >
-                                <div class="version-title">
-                                    API Version {{ version.version }}
-                                </div>
-                                <div class="version-uri">
-                                    {{ version.base_uri }}
-                                </div>
+                                <div
+                                    class="version-title"
+                                    v-text="'API Version ' + version.version"
+                                ></div>
+                                <div
+                                    class="version-uri"
+                                    v-text="version.base_uri"
+                                ></div>
                                 <div
                                     v-if="version.vendor_info"
                                     class="vendor-info"
@@ -801,12 +456,14 @@
                                         :key="key"
                                         class="vendor-info-item"
                                     >
-                                        <span class="vendor-key"
-                                            >{{ key }}:</span
-                                        >
-                                        <span class="vendor-value"
-                                            >{{ value }}</span
-                                        >
+                                        <span
+                                            class="vendor-key"
+                                            v-text="key + ':'"
+                                        ></span>
+                                        <span
+                                            class="vendor-value"
+                                            v-text="value"
+                                        ></span>
                                     </div>
                                 </div>
                             </div>
@@ -814,519 +471,84 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Telemetry Toast Notifications -->
+            <div id="telemetry-toast" class="telemetry-toast">
+                <div class="d-flex align-items-center">
+                    <i class="bi me-2"></i>
+                    <div class="flex-grow-1">
+                        <strong class="toast-title"></strong>
+                        <div class="toast-message"></div>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn-close btn-close-sm ms-2"
+                        @click="hideTelemetryToast()"
+                    ></button>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts Help Modal -->
+            <div v-if="showKeyboardHelp" class="keyboard-help-modal" @click.self="showKeyboardHelp = false">
+                <div class="keyboard-help-content">
+                    <div class="keyboard-help-header">
+                        <h5>Keyboard Shortcuts</h5>
+                        <button type="button" class="btn-close" @click="showKeyboardHelp = false"></button>
+                    </div>
+                    <div class="keyboard-help-body">
+                        <div class="shortcut-section">
+                            <h6>Navigation</h6>
+                            <div class="shortcut-item">
+                                <kbd>↑</kbd> <kbd>↓</kbd>
+                                <span>Navigate up/down in tree</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>←</kbd> <kbd>→</kbd>
+                                <span>Collapse/expand components</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Enter</kbd>
+                                <span>Select focused item</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Home</kbd> <kbd>End</kbd>
+                                <span>Jump to first/last item</span>
+                            </div>
+                        </div>
+                        <div class="shortcut-section">
+                            <h6>Global</h6>
+                            <div class="shortcut-item">
+                                <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd>
+                                <span>Focus filter input</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Esc</kbd>
+                                <span>Clear selection/close dialogs</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>?</kbd>
+                                <span>Show this help</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Tab</kbd>
+                                <span>Navigate between panels</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="keyboard-help-footer">
+                        <small class="text-muted">Press <kbd>Esc</kbd> to close</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- Vue.js 3 (local) -->
+        <script src="./js/vue.global.js"></script>
 
-        <!-- Vue.js Application -->
-        <script>
-            const { createApp } = Vue;
+        <!-- Bootstrap Bundle JS (local) -->
+        <script src="./js/bootstrap.bundle.min.js"></script>
 
-            createApp({
-                data() {
-                    return {
-                        appName: "OpenSOVD",
-                        versionInfo: null,
-                        serverUrl: window.location.host || "localhost",
-                        selectedVersion: null,
-                        showVersionPane: false,
-                        isPaneHovered: false,
-                        isBannerHovered: false,
-                        components: [],
-                        componentsWithResources: [],
-                        selectedItem: null,
-                        componentDetails: null,
-                        resourceData: null,
-                        loadingComponents: false,
-                        loadingDetails: false,
-                        expandedComponents: {},
-                        filterText: "",
-                    };
-                },
-                computed: {
-                    filteredComponents() {
-                        if (!this.filterText) {
-                            return this.componentsWithResources;
-                        }
-                        const searchTerm = this.filterText.toLowerCase();
-                        return this.componentsWithResources.filter(
-                            (component) => {
-                                const name = (
-                                    component.name || component.id
-                                ).toLowerCase();
-                                return name.includes(searchTerm);
-                            },
-                        );
-                    },
-
-                    currentVersion() {
-                        if (this.versionInfo && this.versionInfo.sovd_info) {
-                            if (this.selectedVersion) {
-                                return this.versionInfo.sovd_info.find(
-                                    (v) => v.base_uri === this.selectedVersion,
-                                );
-                            }
-                            return this.versionInfo.sovd_info[0];
-                        }
-                        return null;
-                    },
-
-                    apiBaseUrl() {
-                        const version = this.currentVersion;
-                        return version ? version.base_uri : "/opensovd/v1";
-                    },
-                },
-                methods: {
-                    async fetchVersionInfo() {
-                        await fetch("/opensovd/version-info", {
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                        })
-                            .then((response) => {
-                                if (response.ok) {
-                                    return response.json();
-                                }
-                                return null;
-                            })
-                            .then((data) => {
-                                if (
-                                    data &&
-                                    data.sovd_info &&
-                                    data.sovd_info.length > 0
-                                ) {
-                                    const info = data.sovd_info[0];
-                                    // Format all vendor_info attributes as key:value pairs
-                                    let vendorDetails = "Unknown";
-                                    if (info.vendor_info) {
-                                        vendorDetails = Object.entries(
-                                            info.vendor_info,
-                                        )
-                                            .map(
-                                                ([key, value]) =>
-                                                    `${key}:${value}`,
-                                            )
-                                            .join(", ");
-                                    }
-                                    this.versionInfo = data;
-                                    // Set initial selected version
-                                    if (
-                                        data.sovd_info &&
-                                        data.sovd_info.length > 0
-                                    ) {
-                                        this.selectedVersion =
-                                            data.sovd_info[0].base_uri;
-                                    }
-                                }
-                            })
-                            .catch((error) => {
-                                console.error(
-                                    "Failed to fetch version info:",
-                                    error,
-                                );
-                            });
-                    },
-
-                    async fetchComponents() {
-                        this.loadingComponents = true;
-                        await fetch(`${this.apiBaseUrl}/components`, {
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                        })
-                            .then((response) => {
-                                if (response.ok) {
-                                    return response.json();
-                                }
-                                return null;
-                            })
-                            .then(async (data) => {
-                                if (data) {
-                                    this.components = data.items || [];
-                                    await this.fetchAllComponentResources();
-                                } else {
-                                    this.components = [];
-                                }
-                            })
-                            .catch((error) => {
-                                console.error(
-                                    "Failed to fetch components:",
-                                    error,
-                                );
-                                this.components = [];
-                            })
-                            .finally(() => {
-                                this.loadingComponents = false;
-                            });
-                    },
-
-                    async fetchAllComponentResources() {
-                        const componentsWithResources = [];
-
-                        for (const component of this.components) {
-                            await fetch(
-                                `${this.apiBaseUrl}/components/${component.id}`,
-                                {
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                    },
-                                },
-                            )
-                                .then((response) => {
-                                    if (response.ok) {
-                                        return response.json();
-                                    }
-                                    return null;
-                                })
-                                .then((capabilities) => {
-                                    if (capabilities) {
-                                        const resources =
-                                            this.extractResources(capabilities);
-                                        componentsWithResources.push({
-                                            ...component,
-                                            resources: resources,
-                                        });
-                                    } else {
-                                        componentsWithResources.push(component);
-                                    }
-                                })
-                                .catch((error) => {
-                                    console.error(
-                                        `Failed to fetch resources for ${component.id}:`,
-                                        error,
-                                    );
-                                    componentsWithResources.push(component);
-                                });
-                        }
-
-                        this.componentsWithResources = componentsWithResources;
-                    },
-
-                    extractResources(capabilities) {
-                        const resources = [];
-                        // Extract all properties that look like resources
-                        for (const [key, value] of Object.entries(
-                            capabilities,
-                        )) {
-                            if (
-                                value &&
-                                typeof value === "string" &&
-                                key !== "id" &&
-                                key !== "name" &&
-                                key !== "extensions"
-                            ) {
-                                resources.push({
-                                    key,
-                                    value: value,
-                                });
-                            }
-                        }
-
-                        // Also check resources object if it exists
-                        if (capabilities.resources) {
-                            for (const [key, value] of Object.entries(
-                                capabilities.resources,
-                            )) {
-                                if (
-                                    value &&
-                                    key !== "extensions" &&
-                                    !resources.find((r) => r.key === key)
-                                ) {
-                                    resources.push({ key, value });
-                                }
-                            }
-                        }
-
-                        return resources;
-                    },
-
-                    toggleExpand(componentId) {
-                        this.expandedComponents[componentId] =
-                            !this.expandedComponents[componentId];
-                    },
-
-                    async selectComponent(component) {
-                        // Toggle expansion to show/hide resources
-                        this.toggleExpand(component.id);
-
-                        this.selectedItem = {
-                            type: "component",
-                            id: component.id,
-                            name: component.name,
-                        };
-                        this.componentDetails = null;
-                        this.resourceData = null;
-                        this.loadingDetails = true;
-
-                        await fetch(
-                            `${this.apiBaseUrl}/components/${component.id}`,
-                            {
-                                headers: {
-                                    "Content-Type": "application/json",
-                                },
-                            },
-                        )
-                            .then((response) => {
-                                if (response.ok) {
-                                    return response.json();
-                                }
-                                return null;
-                            })
-                            .then((data) => {
-                                this.componentDetails = data;
-                            })
-                            .catch((error) => {
-                                console.error(
-                                    "Failed to fetch component details:",
-                                    error,
-                                );
-                                this.componentDetails = null;
-                            })
-                            .finally(() => {
-                                this.loadingDetails = false;
-                            });
-                    },
-
-                    async selectResource(component, resource) {
-                        this.selectedItem = {
-                            type: "resource",
-                            key: resource.key,
-                            value: resource.value,
-                            componentId: component.id,
-                            componentName: component.name || component.id,
-                        };
-                        this.componentDetails = null;
-                        this.resourceData = null;
-                        this.loadingDetails = true;
-
-                        // Fetch data from the resource endpoint
-                        await fetch(resource.value, {
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                        })
-                            .then((response) => {
-                                if (response.ok) {
-                                    return response.json();
-                                }
-                                return null;
-                            })
-                            .then((data) => {
-                                this.resourceData = data;
-                            })
-                            .catch((error) => {
-                                console.error(
-                                    "Failed to fetch resource data:",
-                                    error,
-                                );
-                                this.resourceData = null;
-                            })
-                            .finally(() => {
-                                this.loadingDetails = false;
-                            });
-                    },
-
-                    formatResourceName(name) {
-                        // Convert snake_case to Title Case
-                        return name
-                            .split("_")
-                            .map(
-                                (word) =>
-                                    word.charAt(0).toUpperCase() +
-                                    word.slice(1),
-                            )
-                            .join(" ")
-                            .replace(/-/g, " ");
-                    },
-
-                    getResourceIcon(resourceKey) {
-                        const iconMap = {
-                            data: "bi bi-database",
-                            "data-list": "bi bi-database",
-                            data_list: "bi bi-database",
-                            configurations: "bi bi-gear",
-                            faults: "bi bi-exclamation-triangle",
-                            operations: "bi bi-play-circle",
-                            updates: "bi bi-arrow-clockwise",
-                            modes: "bi bi-toggles",
-                            locks: "bi bi-lock",
-                            logs: "bi bi-file-text",
-                            communication_logs: "bi bi-chat-left-text",
-                            scripts: "bi bi-code-slash",
-                            triggers: "bi bi-lightning",
-                            bulk_data: "bi bi-archive",
-                            cyclic_subscriptions: "bi bi-arrow-repeat",
-                        };
-                        return iconMap[resourceKey] || "bi bi-circle";
-                    },
-
-                    formatExtensionKey(key) {
-                        // Convert snake_case or camelCase to Title Case
-                        return key
-                            .replace(/([A-Z])/g, " $1")
-                            .replace(/_/g, " ")
-                            .split(" ")
-                            .map(
-                                (word) =>
-                                    word.charAt(0).toUpperCase() +
-                                    word.slice(1),
-                            )
-                            .join(" ")
-                            .trim();
-                    },
-
-                    formatExtensionValue(value) {
-                        if (value === null || value === undefined) {
-                            return "N/A";
-                        }
-                        if (typeof value === "object") {
-                            if (Array.isArray(value)) {
-                                return value.join(", ");
-                            }
-                            return JSON.stringify(value);
-                        }
-                        return value.toString();
-                    },
-
-                    async onVersionChange() {
-                        // Version changed, re-fetch components with new API base URL
-                        console.log("Version changed to:", this.currentVersion);
-                        this.selectedItem = null;
-                        this.componentDetails = null;
-                        await this.fetchComponents();
-                    },
-
-                    showVersionPaneOnHover() {
-                        this.isBannerHovered = true;
-                        this.showVersionPane = true;
-                        this.$nextTick(() => {
-                            this.positionVersionPane();
-                        });
-                    },
-
-                    hideVersionPaneOnLeave() {
-                        this.isBannerHovered = false;
-                        // Small delay to allow moving to the pane
-                        setTimeout(() => {
-                            if (!this.isPaneHovered && !this.isBannerHovered) {
-                                this.showVersionPane = false;
-                            }
-                        }, 150);
-                    },
-
-                    keepVersionPaneOpen() {
-                        this.isPaneHovered = true;
-                    },
-
-                    positionVersionPane() {
-                        const serverBanner =
-                            document.querySelector(".server-banner");
-                        const versionPane =
-                            document.querySelector(".version-pane");
-
-                        if (serverBanner && versionPane) {
-                            const rect = serverBanner.getBoundingClientRect();
-                            versionPane.style.top = rect.top + "px";
-                            versionPane.style.left = rect.right + 8 + "px";
-                        }
-                    },
-
-                    hidePaneOnLeave() {
-                        this.isPaneHovered = false;
-                        setTimeout(() => {
-                            if (!this.isPaneHovered && !this.isBannerHovered) {
-                                this.showVersionPane = false;
-                            }
-                        }, 150);
-                    },
-
-                    selectVersionFromPane(version) {
-                        this.selectedVersion = version.base_uri;
-                        this.showVersionPane = false;
-                        this.onVersionChange();
-                    },
-
-                    formatVendorInfo(vendorInfo) {
-                        if (!vendorInfo) return [];
-                        if (typeof vendorInfo === "object") {
-                            return Object.entries(vendorInfo);
-                        }
-                        return [];
-                    },
-
-                    clearSelection() {
-                        this.selectedItem = null;
-                        this.componentDetails = null;
-                        this.resourceData = null;
-                    },
-
-                    async selectComponentFromBreadcrumb() {
-                        if (!this.selectedItem) return;
-                        
-                        let componentId;
-                        let componentName;
-                        
-                        if (this.selectedItem.type === 'component') {
-                            componentId = this.selectedItem.id;
-                            componentName = this.selectedItem.name;
-                        } else if (this.selectedItem.type === 'resource') {
-                            componentId = this.selectedItem.componentId;
-                            componentName = this.selectedItem.componentName;
-                        }
-                        
-                        if (componentId) {
-                            // Find the component in our list
-                            const component = this.componentsWithResources.find(c => c.id === componentId);
-                            if (component) {
-                                // Expand the component to show its resources
-                                this.expandedComponents[componentId] = true;
-                                
-                                // Select the component
-                                this.selectedItem = {
-                                    type: "component",
-                                    id: componentId,
-                                    name: componentName,
-                                };
-                                this.componentDetails = null;
-                                this.resourceData = null;
-                                this.loadingDetails = true;
-
-                                await fetch(
-                                    `${this.apiBaseUrl}/components/${componentId}`,
-                                    {
-                                        headers: {
-                                            "Content-Type": "application/json",
-                                        },
-                                    },
-                                )
-                                    .then((response) => {
-                                        if (response.ok) {
-                                            return response.json();
-                                        }
-                                        return null;
-                                    })
-                                    .then((data) => {
-                                        this.componentDetails = data;
-                                    })
-                                    .catch((error) => {
-                                        console.error(
-                                            "Failed to fetch component details:",
-                                            error,
-                                        );
-                                        this.componentDetails = null;
-                                    })
-                                    .finally(() => {
-                                        this.loadingDetails = false;
-                                    });
-                            }
-                        }
-                    },
-                },
-                mounted() {
-                    this.fetchVersionInfo();
-                    this.fetchComponents();
-                },
-            }).mount("#app");
-        </script>
+        <!-- Application JavaScript -->
+        <script src="./js/app.js"></script>
     </body>
 </html>

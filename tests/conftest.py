@@ -109,7 +109,7 @@ def openssl(project_root: Path, tmp_path) -> dict[str, Path]:
             [
                 str(mkcerts_script),
                 str(temp_dir),
-                "30",  # 30 days
+                "30",  # Default to 30 days, consider making configurable
                 "--no-verify",
             ],
             check=True,
@@ -153,8 +153,6 @@ class GatewayManager:
         self.features = features or []
         self.process: sh.RunningCommand | None = None
         self.base_url: str | None = None
-        self._use_https = False  # Track whether to use HTTPS
-        self._ca_cert_path: str | None = None  # CA certificate path for SSL verification
 
     def start(self, args: list[str] | None = None, env: dict[str, str] | None = None) -> str:
         """
@@ -170,7 +168,6 @@ class GatewayManager:
         cmd_args = args or []
         process_env = env or {}
 
-        print(f"Args: {cmd_args}")
         try:
             if self.binary_path:
                 # Use pre-built binary
@@ -230,6 +227,14 @@ class GatewayManager:
             self.process = None
             self.base_url = None
 
+    def __del__(self):
+        """Cleanup on deletion to prevent zombie processes."""
+        if self.process and self.is_running():
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                self.stop()
+
     def send_signal(self, sig: int) -> None:
         """Send a signal to the running gateway process."""
         if self.process is None:
@@ -263,6 +268,9 @@ class GatewayManager:
         start_time = time.time()
         # Pattern to match the actix server listening log
         listen_pattern = re.compile(r"listening on: ([0-9.]+):(\d+)")
+        # Pattern to detect HTTPS/TLS configuration
+        tls_pattern = re.compile(r"(TLS|SSL|https|certificate)", re.IGNORECASE)
+        protocol = "http"  # Default to HTTP
 
         while time.time() - start_time < timeout:
             if not self.is_running():
@@ -274,14 +282,19 @@ class GatewayManager:
                 if self.process is not None:
                     for line in self.process:
                         line = line.rstrip("\n\r")
+                        # Check if TLS/HTTPS is enabled
+                        if tls_pattern.search(line):
+                            protocol = "https"
+                        protocol = "http"
                         match = listen_pattern.search(line)
                         if match:
                             host = match.group(1)
                             port = match.group(2)
-                            protocol = "https"
                             return f"{protocol}://{host}:{port}/opensovd"
-            except ValueError:
-                pass
+            except ValueError as e:
+                # Log the error for debugging but continue waiting
+                print(f"Warning: Error reading process output: {e}")
+                continue
 
             time.sleep(0.1)
 
@@ -310,6 +323,5 @@ def gateway(
     gateway_env: dict[str, str],
 ) -> Generator[GatewayManager, None, None]:
     gateway_manager.start(args=gateway_args, env=gateway_env)
-    print(f"GW: {gateway_args} url: {gateway_manager.base_url}")
     yield gateway_manager
     gateway_manager.stop()

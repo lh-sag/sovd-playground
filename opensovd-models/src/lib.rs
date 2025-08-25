@@ -52,14 +52,9 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct IncludeSchemaParam {
+pub struct IncludeSchemaQuery {
     #[serde(rename = "include-schema", default)]
     pub include_schema: bool,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct TagsParam {
-    pub tags: Vec<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

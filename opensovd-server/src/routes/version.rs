@@ -10,11 +10,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use actix_web::web;
+use actix_web::{HttpRequest, HttpResponse, web};
 use opensovd_models::JsonSchema;
 use opensovd_models::version::VersionResponse;
 
-use crate::response::ApiResult;
+use crate::response::create_api_response;
 
 pub(crate) fn configure<T>(cfg: &mut web::ServiceConfig)
 where
@@ -29,13 +29,15 @@ where
 async fn get_version<T>(
     base_uri: web::Data<super::BaseUri>,
     vendor_info: web::Data<Option<T>>,
-) -> ApiResult<VersionResponse<T>>
+    req: HttpRequest,
+) -> Result<HttpResponse, crate::response::ApiError>
 where
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + JsonSchema + Clone + Send + Sync + 'static,
 {
     // Map ISO to API version.
     const VERSION: (&str, &str) = ("1.1", "v1");
-    ApiResult::ok(VersionResponse {
+
+    let response = VersionResponse {
         sovd_info: vec![
             opensovd_models::version::Info {
                 version: VERSION.0.to_string(),
@@ -48,5 +50,7 @@ where
                 vendor_info: vendor_info.as_ref().clone(),
             },
         ],
-    })
+    };
+
+    Ok(create_api_response(response, &req))
 }

@@ -30,7 +30,7 @@ pub struct EntityReference {
     #[serde(flatten)]
     pub entity: EntityId,
     pub href: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
 }
 
@@ -78,8 +78,8 @@ pub struct Resources {
 pub struct ComponentCapabilitiesResponse {
     #[serde(flatten)]
     pub entity: EntityId,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub variant: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variant: Option<HashMap<String, String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<String>,
@@ -148,13 +148,13 @@ pub struct DataWriteRequest {
 }
 
 /// Query parameters for data resource listing
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
 pub struct DataResourceQuery {
     #[serde(default)]
-    pub categories: Vec<String>, // Filter by categories
+    pub categories: Option<Vec<String>>, // Filter by categories
     #[serde(default)]
-    pub groups: Vec<String>, // Filter by groups
+    pub groups: Option<Vec<String>>, // Filter by groups
     #[serde(rename = "include-schema", default)]
-    pub include_schema: bool, // Include schema in response
+    pub include_schema: Option<bool>, // Include schema in response
 }

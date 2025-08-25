@@ -42,10 +42,10 @@ let version_info = Response {
 ### Using request/response models
 
 ```rust
-use opensovd_models::{IncludeSchemaParam, ApiResponse};
+use opensovd_models::{IncludeSchemaQuery, ApiResponse};
 
 // Create a request parameter
-let param = IncludeSchemaParam {
+let param = IncludeSchemaQuery {
     include_schema: true,
 };
 

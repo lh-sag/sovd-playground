@@ -11,5 +11,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+
 def test_start_stop(gateway):
     assert gateway.is_running()

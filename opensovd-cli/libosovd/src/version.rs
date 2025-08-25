@@ -11,20 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use derive_more::{Display, Error as DeriveError, From};
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
 
-#[derive(Debug, Display, From, DeriveError)]
-pub enum Error {
-    #[display("IO error: {}", _0)]
-    Io(std::io::Error),
-
-    #[display("Invalid URI: {}", _0)]
-    InvalidUri(http::uri::InvalidUri),
-
-    #[display("Bad configuration: {}", _0)]
-    #[error(ignore)]
-    BadConfiguration(String),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
+pub const ENABLED_FEATURES: &[&str] = &[
+    #[cfg(feature = "ui")]
+    "ui",
+    #[cfg(feature = "openssl")]
+    "openssl",
+    #[cfg(feature = "config")]
+    "config",
+];

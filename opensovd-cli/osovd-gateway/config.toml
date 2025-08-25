@@ -1,0 +1,169 @@
+# Build with: cargo build --bin osovd-gateway --features config
+
+[server]
+name = "OpenSOVD Gateway"
+default_path = "/opensovd"
+
+# Engine Controller Component
+[[components]]
+id = "engine-controller"
+name = "Engine Control Unit"
+
+# Standard ISO 17978-3 current data
+[[components.data]]
+id = "temperature"
+name = "Engine Temperature"
+category = "currentData"
+groups = ["engine", "temperature"]
+tags = ["celsius"]
+value = { value = 90.5, unit = "celsius" }
+writable = true
+
+[[components.data]]
+id = "rpm"
+name = "Engine RPM"
+category = "currentData"
+groups = ["engine", "performance"]
+tags = ["rpm"]
+value = { value = 2500, unit = "rpm" }
+writable = true
+
+[[components.data]]
+id = "oil_pressure"
+name = "Oil Pressure"
+category = "currentData"
+groups = ["engine", "fluids"]
+tags = ["pressure"]
+value = { value = 45, unit = "psi" }
+writable = true
+
+# Identification data (read-only)
+[[components.data]]
+id = "serial_number"
+name = "Engine Serial Number"
+category = "identData"
+groups = ["engine", "identification"]
+tags = ["serial"]
+value = "ENG-2024-001"
+writable = false
+
+# Vendor-specific Caterpillar extensions
+[[components.data]]
+id = "turbo_boost"
+name = "Turbocharger Boost Pressure"
+category = "x-caterpillar-engine"
+groups = ["engine", "turbo"]
+tags = ["pressure", "boost"]
+value = { value = 18.5, unit = "psi", max = 25.0 }
+writable = true
+
+[[components.data]]
+id = "def_level"
+name = "Diesel Exhaust Fluid Level"
+category = "x-caterpillar-aftertreatment"
+groups = ["engine", "aftertreatment"]
+tags = ["def", "fluid"]
+value = { level = 75, unit = "percent" }
+writable = true
+
+# Transmission Controller Component
+[[components]]
+id = "transmission-controller"
+name = "Transmission Control Module"
+
+[[components.data]]
+id = "gear"
+name = "Current Gear"
+category = "currentData"
+groups = ["transmission", "gearing"]
+tags = ["gear"]
+value = { current = 3, max = 6 }
+writable = true
+
+[[components.data]]
+id = "fluid_temp"
+name = "Transmission Fluid Temperature"
+category = "currentData"
+groups = ["transmission", "fluids"]
+tags = ["temperature"]
+value = { value = 75, unit = "celsius" }
+writable = true
+
+[[components.data]]
+id = "shift_mode"
+name = "Shift Mode"
+category = "currentData"
+groups = ["transmission", "control"]
+tags = ["mode"]
+value = "automatic"
+writable = true
+
+[[components.data]]
+id = "part_number"
+name = "Transmission Part Number"
+category = "identData"
+groups = ["transmission", "identification"]
+tags = ["part"]
+value = "TRANS-X900-2024"
+writable = false
+
+# Vendor-specific Allison extensions
+[[components.data]]
+id = "torque_converter_lockup"
+name = "Torque Converter Lockup Status"
+category = "x-allison-transmission"
+groups = ["transmission", "torque-converter"]
+tags = ["lockup", "status"]
+value = { locked = true, slip_rpm = 25 }
+writable = true
+
+# Hydraulics Controller Component
+[[components]]
+id = "hydraulics-controller"
+name = "Hydraulic Control System"
+
+# Vendor-specific Liebherr hydraulics
+[[components.data]]
+id = "main_pressure"
+name = "Main Hydraulic System Pressure"
+category = "x-liebherr-hydraulics"
+groups = ["hydraulics", "pressure"]
+tags = ["main", "system"]
+value = { value = 350, unit = "bar", max = 420 }
+writable = true
+
+[[components.data]]
+id = "pilot_pressure"
+name = "Pilot Control Pressure"
+category = "x-liebherr-hydraulics"
+groups = ["hydraulics", "pilot"]
+tags = ["pilot", "control"]
+value = { value = 28, unit = "bar", target = 30 }
+writable = true
+
+[[components.data]]
+id = "boom_position"
+name = "Boom Cylinder Position"
+category = "x-liebherr-construction"
+groups = ["hydraulics", "boom"]
+tags = ["position", "cylinder"]
+value = { extension = 65, unit = "percent" }
+writable = true
+
+[[components.data]]
+id = "fluid_temperature"
+name = "Hydraulic Fluid Temperature"
+category = "currentData"
+groups = ["hydraulics", "fluids"]
+tags = ["temperature"]
+value = { value = 45, unit = "celsius", warning_threshold = 80 }
+writable = true
+
+[[components.data]]
+id = "pump_model"
+name = "Hydraulic Pump Model"
+category = "identData"
+groups = ["hydraulics", "pump"]
+tags = ["model", "identification"]
+value = "LH-PUMP-350-V2"
+writable = false

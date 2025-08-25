@@ -18,121 +18,57 @@
 use serde::{Deserialize, Serialize};
 
 /// Data categories with support for vendor extensions
-/// 
+///
 /// This generic enum allows both standard ISO 17978-3 categories and vendor-specific
 /// extensions through the type parameter V.
-/// 
+///
 /// # Type Parameters
 /// * `V` - The vendor extension type (defaults to String for flexibility)
-/// 
+///
 /// # Examples
 /// ```rust
-/// // Standard categories (no vendor extensions)
-/// let standard = DataCategory::<()>::CurrentData;
-/// 
+/// use opensovd_models::data::DataCategory;
+///
+/// // Standard categories
+/// let standard = DataCategory::CurrentData;
+///
 /// // String-based vendor categories
 /// let string_vendor = DataCategory::Vendor("x-liebherr-hydraulics".to_string());
-/// 
-/// // Typed vendor categories
-/// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// enum MyVendorCategory { Hydraulics, Engine }
-/// let typed_vendor = DataCategory::Vendor(MyVendorCategory::Hydraulics);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
-pub enum DataCategory<V = String> 
-where
-    V: Clone + PartialEq + Eq + std::hash::Hash + std::fmt::Debug
-{
+pub enum DataCategory {
     /// Identification data - static information about the entity
+    #[display("identData")]
+    #[serde(rename = "identData")]
     IdentData,
     /// Current data - live/real-time values
+    #[display("currentData")]
+    #[serde(rename = "currentData")]
     CurrentData,
     /// Stored data - historical/logged values
+    #[display("storedData")]
+    #[serde(rename = "storedData")]
     StoredData,
     /// System information - diagnostic/status data
+    #[display("sysInfo")]
+    #[serde(rename = "sysInfo")]
     SysInfo,
     /// Vendor-specific category extension
-    Vendor(V),
+    #[display("{}", _0)]
+    Vendor(String),
 }
 
-/// Convenient type aliases for common usage patterns
-/// Standard ISO categories only (no vendor extensions)
-pub type StandardDataCategory = DataCategory<()>;
-
-/// String-based vendor categories (most flexible)
-pub type StringDataCategory = DataCategory<String>;
-
-/// Serialization support for StringDataCategory
-impl Serialize for StringDataCategory {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            DataCategory::IdentData => serializer.serialize_str("identData"),
-            DataCategory::CurrentData => serializer.serialize_str("currentData"),
-            DataCategory::StoredData => serializer.serialize_str("storedData"),
-            DataCategory::SysInfo => serializer.serialize_str("sysInfo"),
-            DataCategory::Vendor(vendor) => serializer.serialize_str(vendor),
-        }
-    }
-}
-
-/// Deserialization support for StringDataCategory
-impl<'de> Deserialize<'de> for StringDataCategory {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "identData" => Ok(DataCategory::IdentData),
-            "currentData" => Ok(DataCategory::CurrentData),
-            "storedData" => Ok(DataCategory::StoredData),
-            "sysInfo" => Ok(DataCategory::SysInfo),
-            vendor if vendor.starts_with("x-") => {
-                StringDataCategory::new_string_vendor(vendor).map_err(serde::de::Error::custom)
-            }
-            _ => Err(serde::de::Error::custom(format!("Unknown data category: {}", s))),
-        }
-    }
-}
-
-impl<V> DataCategory<V> 
-where
-    V: Clone + PartialEq + Eq + std::hash::Hash + std::fmt::Debug
-{
-    /// Checks if this is a standard ISO category
-    pub fn is_standard(&self) -> bool {
-        matches!(self, DataCategory::IdentData | DataCategory::CurrentData | 
-                      DataCategory::StoredData | DataCategory::SysInfo)
-    }
-
-    /// Checks if this is a vendor category
-    pub fn is_vendor(&self) -> bool {
-        matches!(self, DataCategory::Vendor(_))
-    }
-
-    /// Gets a reference to the vendor extension if this is a vendor category
-    pub fn vendor(&self) -> Option<&V> {
-        match self {
-            DataCategory::Vendor(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-impl DataCategory<String> {
+impl DataCategory {
     /// Creates a new string-based vendor category with validation
-    /// 
+    ///
     /// # Arguments
     /// * `category` - The vendor category string (should start with "x-")
-    /// 
+    ///
     /// # Returns
     /// * `Ok(DataCategory::Vendor(...))` if valid
     /// * `Err(...)` if invalid format
-    pub fn new_string_vendor(category: impl Into<String>) -> Result<Self, DataCategoryError> {
+    pub fn new_vendor(category: impl Into<String>) -> Result<Self, DataCategoryError> {
         let category_str = category.into();
         if is_valid_vendor_category(&category_str) {
             Ok(DataCategory::Vendor(category_str))
@@ -143,7 +79,7 @@ impl DataCategory<String> {
 }
 
 /// Validates vendor category format: x-<extension>
-/// 
+///
 /// Rules:
 /// - Must start with "x-"
 /// - Extension must be 1-32 characters
@@ -153,23 +89,77 @@ fn is_valid_vendor_category(category: &str) -> bool {
     if !category.starts_with("x-") {
         return false;
     }
-    
+
     let extension = &category[2..];
-    if extension.is_empty() || extension.len() > 32 {
+    if extension.is_empty() {
         return false;
     }
-    
-    if extension.ends_with('-') || extension.contains("--") {
-        return false;
-    }
-    
-    extension.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+
+    extension
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
 /// Error type for data category validation
 #[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
 pub enum DataCategoryError {
     /// Invalid vendor category format
-    #[display("Invalid vendor category format: '{}'. Must start with 'x-' and contain only lowercase letters, digits, and hyphens", _0)]
+    #[display(
+        "Invalid vendor category format: '{}'. Must start with 'x-' and contain only lowercase letters, digits, and hyphens",
+        _0
+    )]
     InvalidFormat(#[error(ignore)] String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_vendor_categories() {
+        // Test basic valid vendor categories
+        assert!(DataCategory::new_vendor("x-liebherr").is_ok());
+        assert!(DataCategory::new_vendor("x-caterpillar-engine").is_ok());
+        assert!(DataCategory::new_vendor("x-test123").is_ok());
+        assert!(DataCategory::new_vendor("x-under_score").is_ok());
+
+        // Test that valid vendor categories display correctly
+        let vendor = DataCategory::new_vendor("x-test").unwrap();
+        assert_eq!(format!("{vendor}"), "x-test");
+
+        // Test various valid combinations
+        assert!(DataCategory::new_vendor("x-a").is_ok());
+        assert!(DataCategory::new_vendor("x-123").is_ok());
+        assert!(DataCategory::new_vendor("x-test-with-hyphens").is_ok());
+        assert!(DataCategory::new_vendor("x-mix3d_ch4rs").is_ok());
+    }
+
+    #[test]
+    fn test_invalid_vendor_categories() {
+        // Test missing prefix
+        assert!(DataCategory::new_vendor("no-prefix").is_err());
+        assert!(DataCategory::new_vendor("liebherr").is_err());
+
+        // Test empty extension
+        assert!(DataCategory::new_vendor("x-").is_err());
+
+        // Test uppercase characters
+        assert!(DataCategory::new_vendor("x-UPPER").is_err());
+        assert!(DataCategory::new_vendor("x-Mixed").is_err());
+
+        // Test invalid characters
+        assert!(DataCategory::new_vendor("x-space here").is_err());
+        assert!(DataCategory::new_vendor("x-special@").is_err());
+        assert!(DataCategory::new_vendor("x-dot.here").is_err());
+        assert!(DataCategory::new_vendor("x-slash/here").is_err());
+
+        // Test wrong prefix
+        assert!(DataCategory::new_vendor("y-wrong").is_err());
+        assert!(DataCategory::new_vendor("X-wrong").is_err());
+
+        // Test completely invalid formats
+        assert!(DataCategory::new_vendor("").is_err());
+        assert!(DataCategory::new_vendor("x").is_err());
+        assert!(DataCategory::new_vendor("-test").is_err());
+    }
 }

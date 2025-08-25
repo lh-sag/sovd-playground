@@ -3,8 +3,11 @@ name = "opensovd-models"
 description = "SOVD (ISO 17978) models and types"
 readme = "README.md"
 edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 license = { workspace = true }
 version = { workspace = true }
+authors = { workspace = true }
 
 [features]
 default = ["jsonschema-schemars"]

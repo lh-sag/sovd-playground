@@ -20,60 +20,40 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::entities::Component;
+use crate::resources::data::DataResource;
 
-/// Builder for constructing a Diagnostic system
-///
-/// The DiagnosticBuilder provides a simple API for creating a Diagnostic system
-/// by adding pre-built components.
-///
-/// # Examples
-///
-/// ```rust
-/// # use opensovd_diagnostic::diagnostic::Diagnostic;
-/// # use opensovd_diagnostic::entities::Component;
-/// let component = Component::new("engine".into(), "Engine ECU".into());
-/// let diagnostic = Diagnostic::builder()
-///     .add_component(component)
-///     .build();
-/// ```
+#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
+pub enum BuilderError {
+    #[display("Component with id '{}' already exists", _0)]
+    DuplicateComponent(#[error(ignore)] String),
+}
+
+
 pub struct DiagnosticBuilder {
     components: HashMap<String, Component>,
+    next_id: usize,
 }
 
 impl DiagnosticBuilder {
-    /// Creates a new DiagnosticBuilder
     pub fn new() -> Self {
         Self {
             components: HashMap::new(),
+            next_id: 1,
         }
     }
 
-    /// Adds a component to the builder
-    ///
-    /// # Arguments
-    ///
-    /// * `component` - A Component instance to be added to the diagnostic system
-    ///
-    /// # Returns
-    ///
-    /// The DiagnosticBuilder for further chaining
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use opensovd_diagnostic::diagnostic::Diagnostic;
-    /// # use opensovd_diagnostic::entities::Component;
-    /// let component = Component::new("engine".into(), "Engine ECU".into());
-    /// let diagnostic = Diagnostic::builder()
-    ///     .add_component(component)
-    ///     .build();
-    /// ```
-    pub fn add_component(mut self, component: Component) -> Self {
-        self.components.insert(component.id().clone(), component);
-        self
+
+    pub fn component(mut self, name: impl Into<String>) -> ComponentBuilder {
+        let id = self.next_id.to_string();
+        self.next_id += 1;
+        ComponentBuilder {
+            parent: self,
+            id,
+            name: name.into(),
+            data_resource: None,
+        }
     }
 
-    /// Builds the immutable Diagnostic system
     pub fn build(self) -> Diagnostic {
         Diagnostic {
             components: Arc::new(self.components),
@@ -87,50 +67,41 @@ impl Default for DiagnosticBuilder {
     }
 }
 
-/// The main diagnostic system containing components (immutable after creation)
 pub struct Diagnostic {
     components: Arc<HashMap<String, Component>>,
 }
 
 impl Diagnostic {
-    /// Creates a new empty diagnostic system
     pub fn new() -> Self {
         Self {
             components: Arc::new(HashMap::new()),
         }
     }
 
-    /// Creates a new DiagnosticBuilder
     pub fn builder() -> DiagnosticBuilder {
         DiagnosticBuilder::new()
     }
 
-    /// Retrieves a component by id
     pub fn get_component(&self, id: &str) -> Option<&Component> {
         self.components.get(id)
     }
 
-    /// Returns a list of all component IDs
     pub fn component_ids(&self) -> impl Iterator<Item = &String> {
         self.components.keys()
     }
 
-    /// Returns an iterator over all components
     pub fn components(&self) -> impl Iterator<Item = &Component> {
         self.components.values()
     }
 
-    /// Returns an iterator over all component entries (id, component pairs)
     pub fn component_entries(&self) -> impl Iterator<Item = (&String, &Component)> {
         self.components.iter()
     }
 
-    /// Returns the number of components in the system
     pub fn component_count(&self) -> usize {
         self.components.len()
     }
 
-    /// Checks if a component with the given id exists
     pub fn has_component(&self, id: &str) -> bool {
         self.components.contains_key(id)
     }
@@ -149,3 +120,37 @@ impl Clone for Diagnostic {
         }
     }
 }
+
+pub struct ComponentBuilder {
+    parent: DiagnosticBuilder,
+    id: String,
+    name: String,
+    data_resource: Option<Box<dyn DataResource>>,
+}
+
+impl ComponentBuilder {
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = id.into();
+        self
+    }
+
+    pub fn data_resource<T: DataResource + 'static>(mut self, data_resource: T) -> Self {
+        self.data_resource = Some(Box::new(data_resource));
+        self
+    }
+
+    pub fn add(mut self) -> Result<DiagnosticBuilder, BuilderError> {
+        if self.parent.components.contains_key(&self.id) {
+            return Err(BuilderError::DuplicateComponent(self.id.clone()));
+        }
+        
+        let mut component = Component::new(self.id.clone(), self.name);
+        if let Some(data) = self.data_resource {
+            component.data_resource(data);
+        }
+        
+        self.parent.components.insert(self.id, component);
+        Ok(self.parent)
+    }
+}
+

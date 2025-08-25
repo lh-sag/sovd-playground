@@ -12,14 +12,12 @@ authors = { workspace = true }
 
 [features]
 default = []
-tracing = ["opensovd-tracing/tracing", "dep:tracing"]
 openssl = ["dep:openssl", "dep:hyper-openssl", "dep:tokio-openssl"]
 
 [dependencies]
 serde = { workspace = true }
-opensovd-tracing = { workspace = true }
 opensovd-models = { workspace = true }
-tracing = { workspace = true, optional = true }
+tracing = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
 hyper = { workspace = true, features = ["client", "http1", "http2"] }

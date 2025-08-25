@@ -18,13 +18,13 @@
 
 pub mod convert;
 pub mod error;
+pub mod middleware;
 pub mod response;
 pub mod routes;
 mod server;
 mod server_config;
 
 // Re-export main types for convenience
-pub use error::{ApiError, Error, Result, VendorError};
-pub use response::ApiResult;
+pub use error::{Error, Result};
 pub use server::Server;
 pub use server_config::{ServerConfig, ServerConfigBuilder};

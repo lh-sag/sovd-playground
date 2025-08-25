@@ -12,17 +12,15 @@
 //
 
 use clap::Parser;
-#[cfg(feature = "openssl")]
-use libosovd::SslArgs;
+pub use libosovd::version::VERSION;
 
-pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
 const DEFAULT_BASE_URI: &str = "http://127.0.0.1:9000/opensovd";
 
 #[derive(Parser)]
 #[command(name = env!("CARGO_BIN_NAME"))]
-#[command(about = "OpenSOVD server")]
+#[command(about = "OpenSOVD gateway")]
 #[command(version = VERSION)]
-#[command(long_about = "OpenSOVD Gateway Server
+#[command(long_about = "OpenSOVD Gateway
 
 This server can bind to multiple URLs simultaneously. Specify multiple --url arguments
 to listen on different ports, interfaces, or socket types. HTTPS URLs require TLS
@@ -51,9 +49,14 @@ pub struct Args {
     #[arg(short = 'u', long = "url", action = clap::ArgAction::Append)]
     pub urls: Vec<String>,
 
+    /// Path to configuration file.
+    #[cfg(feature = "config")]
+    #[arg(short = 'c', long = "config", default_value = "config.toml")]
+    pub config: std::path::PathBuf,
+
     #[cfg(feature = "openssl")]
     #[command(flatten)]
-    pub ssl: SslArgs,
+    pub ssl: libosovd::SslArgs,
 }
 
 impl Args {

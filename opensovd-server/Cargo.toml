@@ -10,9 +10,9 @@ repository = { workspace = true }
 version = { workspace = true }
 authors = { workspace = true }
 
+
 [features]
-default = ["tracing", "jsonschema-schemars"]
-tracing = ["opensovd-tracing/tracing", "dep:tracing"]
+default = ["jsonschema-schemars"]
 openssl = ["dep:openssl", "actix-web/openssl"]
 http2 = ["actix-web/http2"]
 ui = ["dep:actix-files"]
@@ -22,12 +22,12 @@ jsonschema-schemars = [
     "opensovd-models/jsonschema-schemars",
     "jsonschema",
 ]
+metrics = ["opensovd-diagnostic/metrics"]
 
 [dependencies]
 serde = { workspace = true }
 opensovd-diagnostic = { workspace = true }
-opensovd-tracing = { workspace = true }
-tracing = { workspace = true, optional = true }
+tracing = { workspace = true }
 actix-web = { workspace = true }
 actix-files = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }

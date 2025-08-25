@@ -125,8 +125,8 @@ impl ServerConfig {
 ///
 /// # HTTPS Configuration
 ///
-/// For HTTPS support, use the `openssl()` method to configure SSL settings,
-/// then add HTTPS listeners with `listen_https()`:
+/// For HTTPS support, use the `listen_openssl()` method to add HTTPS listeners
+/// with their SSL configuration:
 ///
 /// ```rust
 /// # #[cfg(feature = "openssl")] {
@@ -146,9 +146,8 @@ impl ServerConfig {
 /// ssl_builder.set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
 ///
 /// let config = ServerConfig::builder()
-///     .listen(http_listener)              // HTTP listener
-///     .openssl(ssl_builder)               // Configure SSL for HTTPS
-///     .listen_https(https_listener)       // HTTPS listener
+///     .listen(http_listener)                          // HTTP listener
+///     .listen_openssl(https_listener, ssl_builder)   // HTTPS listener with SSL config
 ///     .build()?;
 /// # Ok(())
 /// # }
@@ -160,8 +159,6 @@ pub struct ServerConfigBuilder<T = VendorInfo> {
     vendor_info: Option<T>,
     uri_path: Option<String>,
     diagnostic: Arc<Diagnostic>,
-    #[cfg(feature = "openssl")]
-    ssl_config: Option<SslAcceptorBuilder>,
 }
 
 impl<T> ServerConfigBuilder<T> {
@@ -173,8 +170,6 @@ impl<T> ServerConfigBuilder<T> {
             vendor_info: None,
             uri_path: None,
             diagnostic: Arc::new(Diagnostic::new()),
-            #[cfg(feature = "openssl")]
-            ssl_config: None,
         }
     }
 
@@ -184,65 +179,10 @@ impl<T> ServerConfigBuilder<T> {
         self
     }
 
-    /// Add an HTTPS TCP socket listener.
-    ///
-    /// If SSL configuration was set via `openssl()`, it will be used.
-    /// Otherwise, you must provide the SSL configuration directly.
-    #[cfg(feature = "openssl")]
-    pub fn listen_https(mut self, listener: TcpListener) -> Self {
-        if let Some(ssl_config) = self.ssl_config.take() {
-            self.listeners.push(Listener::SecureTcp(listener, ssl_config));
-        } else {
-            panic!("HTTPS listener requires SSL configuration. Call openssl() first or use listen_openssl()");
-        }
-        self
-    }
-
     /// Add a secure TCP socket listener using a TcpListener with explicit SSL configuration.
     #[cfg(feature = "openssl")]
     pub fn listen_openssl(mut self, listener: TcpListener, ssl_acceptor_builder: SslAcceptorBuilder) -> Self {
         self.listeners.push(Listener::SecureTcp(listener, ssl_acceptor_builder));
-        self
-    }
-
-    /// Configure OpenSSL settings for subsequent HTTPS listeners.
-    ///
-    /// This method accepts a pre-configured `SslAcceptorBuilder` which will be used
-    /// for any HTTPS listeners added with `listen_https()` after calling this method.
-    ///
-    /// # Arguments
-    ///
-    /// * `ssl_acceptor_builder` - A configured SslAcceptorBuilder with certificates and TLS settings
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::net::TcpListener;
-    /// use opensovd_server::ServerConfig;
-    /// use openssl::ssl::{SslAcceptor, SslMethod, SslVerifyMode, SslFiletype};
-    ///
-    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let http_listener = TcpListener::bind("127.0.0.1:8080")?;
-    /// let https_listener = TcpListener::bind("127.0.0.1:8443")?;
-    ///
-    /// // Configure SSL with client certificate verification (mTLS)
-    /// let mut ssl_builder = SslAcceptor::mozilla_modern_v5(SslMethod::tls_server())?;
-    /// ssl_builder.set_private_key_file("server.key", SslFiletype::PEM)?;
-    /// ssl_builder.set_certificate_chain_file("server.pem")?;
-    /// ssl_builder.set_ca_file("ca.pem")?;
-    /// ssl_builder.set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
-    ///
-    /// let config = ServerConfig::builder()
-    ///     .listen(http_listener)           // HTTP listener
-    ///     .openssl(ssl_builder)           // Configure SSL
-    ///     .listen_https(https_listener)   // HTTPS listener using the SSL config
-    ///     .build()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg(feature = "openssl")]
-    pub fn openssl(mut self, ssl_acceptor_builder: SslAcceptorBuilder) -> Self {
-        self.ssl_config = Some(ssl_acceptor_builder);
         self
     }
 
@@ -318,8 +258,6 @@ impl Default for ServerConfigBuilder<VendorInfo> {
             }),
             uri_path: Some("/".to_string()),
             diagnostic: Arc::new(Diagnostic::new()),
-            #[cfg(feature = "openssl")]
-            ssl_config: None,
         }
     }
 }
@@ -398,52 +336,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "openssl")]
-    fn test_openssl_configuration() {
-        use openssl::ssl::{SslAcceptor, SslMethod};
-
-        let http_listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let https_listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let vendor_info = VendorInfo {
-            version: "1.0.0".to_string(),
-            name: "SSLServer".to_string(),
-        };
-
-        // Create a basic SSL acceptor builder for testing
-        let ssl_builder = SslAcceptor::mozilla_modern_v5(SslMethod::tls_server()).unwrap();
-        // Note: In a real test, you'd set actual certificate files
-        // ssl_builder.set_private_key_file("test.key", SslFiletype::PEM).unwrap();
-        // ssl_builder.set_certificate_chain_file("test.pem").unwrap();
-
-        let config = ServerConfig::builder()
-            .listen(http_listener)
-            .openssl(ssl_builder)
-            .listen_https(https_listener)
-            .vendor_info(vendor_info)
-            .build()
-            .unwrap();
-
-        assert_eq!(config.listeners.len(), 2);
-
-        // Check that we have both HTTP and HTTPS listeners
-        let mut http_count = 0;
-        let mut https_count = 0;
-
-        for listener in &config.listeners {
-            match listener {
-                Listener::Tcp(_) => http_count += 1,
-                #[cfg(feature = "openssl")]
-                Listener::SecureTcp(_, _) => https_count += 1,
-                #[cfg(unix)]
-                Listener::Unix(_) => {}
-            }
-        }
-
-        assert_eq!(http_count, 1);
-        assert_eq!(https_count, 1);
-    }
-
-    #[test]
-    #[cfg(feature = "openssl")]
     fn test_listen_openssl_direct() {
         use openssl::ssl::{SslAcceptor, SslMethod};
 
@@ -469,24 +361,6 @@ mod tests {
             Listener::SecureTcp(_, _) => {} // Expected
             _ => panic!("Expected SecureTcp listener"),
         }
-    }
-
-    #[test]
-    #[cfg(feature = "openssl")]
-    #[should_panic(expected = "HTTPS listener requires SSL configuration")]
-    fn test_listen_https_without_ssl_config_panics() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let vendor_info = VendorInfo {
-            version: "1.0.0".to_string(),
-            name: "TestServer".to_string(),
-        };
-
-        // This should panic because we haven't called openssl() first
-        let _config = ServerConfig::builder()
-            .listen_https(listener)
-            .vendor_info(vendor_info)
-            .build()
-            .unwrap();
     }
 
     #[test]

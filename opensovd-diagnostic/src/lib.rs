@@ -20,7 +20,9 @@ pub mod diagnostic;
 pub mod entities;
 pub mod resources;
 
-pub use diagnostic::{Diagnostic, DiagnosticBuilder};
+#[cfg(feature = "metrics")]
+pub mod metrics;
+
+pub use diagnostic::{Diagnostic, DiagnosticBuilder, ComponentBuilder};
 pub use entities::Component;
-pub use resources::{HashMapDataResource, Resource, DataItem, DataCategory, DataError};
-pub use resources::data::{DataResource, DataErrorCode};
+pub use resources::data::DataResource;

@@ -10,21 +10,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+use actix_web::{HttpResponse, web};
+use serde_json::json;
 
-use derive_more::{Display, Error as DeriveError, From};
-
-#[derive(Debug, Display, From, DeriveError)]
-pub enum Error {
-    #[display("IO error: {}", _0)]
-    Io(std::io::Error),
-
-    #[display("Invalid URI: {}", _0)]
-    InvalidUri(http::uri::InvalidUri),
-
-    #[display("Bad configuration: {}", _0)]
-    #[error(ignore)]
-    BadConfiguration(String),
+pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/hello").route(web::get().to(get_hello)));
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
+async fn get_hello() -> Result<HttpResponse, crate::response::ApiError> {
+    let response = json!("Hello World");
+    Ok(HttpResponse::Ok().json(response))
+}

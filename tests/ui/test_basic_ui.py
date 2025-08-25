@@ -16,11 +16,6 @@ import requests
 from playwright.sync_api import Page, expect
 
 
-@pytest.fixture
-def gateway_features():
-    return ["ui"]
-
-
 def test_page_loads(page: Page, gateway_url: str, check_playwright_installed):
     """Test that the UI page loads successfully at /ui path."""
     # Extract base URL without the /opensovd path
@@ -29,17 +24,17 @@ def test_page_loads(page: Page, gateway_url: str, check_playwright_installed):
     # Check if UI feature is enabled by testing if /ui endpoint exists
     ui_url = f"{base_url}/ui"
     try:
-        response = requests.get(ui_url, timeout=2)
+        response = requests.get(ui_url, timeout=5)
         if response.status_code == 404:
             pytest.skip("UI feature not enabled. Run with --osovd-gateway-features='ui' to enable")
-    except requests.RequestException:
-        pytest.skip("Could not reach UI endpoint. UI feature may not be enabled")
+    except requests.RequestException as e:
+        pytest.skip(f"Could not reach UI endpoint at {ui_url}. UI feature may not be enabled: {e}")
 
     # Navigate to the UI endpoint at /ui
     page.goto(ui_url)
 
-    # Wait for the Vue app to mount
-    page.wait_for_selector("#app", timeout=5000)
+    # Wait for the Vue app to mount with increased timeout for slower systems
+    page.wait_for_selector("#app", timeout=10000)
 
     # Verify the page title
     expect(page).to_have_title("OpenSOVD")

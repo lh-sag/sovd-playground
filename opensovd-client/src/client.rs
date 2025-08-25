@@ -15,6 +15,7 @@ use http_body_util::{BodyExt, Empty};
 use hyper::body::Bytes;
 use hyper::{Method, Request, Uri};
 use hyper_util::rt::TokioIo;
+use opensovd_models::entity::{ComponentCapabilitiesResponse, EntityResponse};
 use opensovd_models::version::VersionResponse;
 #[cfg(feature = "openssl")]
 use openssl::ssl::{SslConnector, SslMethod};
@@ -140,9 +141,13 @@ impl Client {
     where
         T: for<'de> serde::Deserialize<'de>,
     {
-        // Parse base URL and construct version-info endpoint
-        // URL is already validated in config, so this should not fail
-        let base_url = Url::parse(&self.config.url).map_err(|e| Error::InvalidResponse(format!("Invalid URL: {e}")))?;
+        // Ensure base URL ends with / for proper path joining
+        let base_url_str = if self.config.url.ends_with('/') {
+            self.config.url.clone()
+        } else {
+            format!("{}/", self.config.url)
+        };
+        let base_url = Url::parse(&base_url_str).map_err(|e| Error::InvalidResponse(format!("Invalid URL: {e}")))?;
 
         let version_url = base_url
             .join("version-info")
@@ -225,6 +230,94 @@ impl Client {
     /// Returns the base URL of the SOVD server.
     pub fn url(&self) -> &str {
         &self.config.url
+    }
+
+    pub async fn components(&self) -> Result<EntityResponse, Error> {
+        self.make_entity_request("components").await
+    }
+
+    pub async fn component_capabilities(&self, component_id: &str) -> Result<ComponentCapabilitiesResponse, Error> {
+        self.make_entity_request(&format!("components/{}", component_id)).await
+    }
+
+    async fn make_entity_request<T>(&self, endpoint: &str) -> Result<T, Error>
+    where
+        T: for<'de> serde::Deserialize<'de>,
+    {
+        // Ensure base URL ends with / for proper path joining
+        let base_url_str = if self.config.url.ends_with('/') {
+            self.config.url.clone()
+        } else {
+            format!("{}/", self.config.url)
+        };
+        let base_url = Url::parse(&base_url_str).map_err(|e| Error::InvalidResponse(format!("Invalid URL: {e}")))?;
+
+        let entity_url = base_url
+            .join(endpoint)
+            .map_err(|e| Error::InvalidResponse(format!("Failed to construct entity URL: {e}")))?;
+
+        let host = base_url
+            .host_str()
+            .ok_or_else(|| Error::InvalidResponse("Invalid URL: missing host".to_string()))?;
+        let port = base_url
+            .port()
+            .unwrap_or(if base_url.scheme() == "https" { 443 } else { 80 });
+
+        if base_url.scheme() == "https" {
+            #[cfg(feature = "openssl")]
+            {
+                return self.make_tls_entity_request(host, port, entity_url).await;
+            }
+            #[cfg(not(feature = "openssl"))]
+            {
+                return Err(Error::InvalidResponse(
+                    "HTTPS is not supported. Enable the 'openssl' feature".to_string(),
+                ));
+            }
+        }
+
+        let tcp_stream = tokio::time::timeout(self.config.timeout, TcpStream::connect(format!("{host}:{port}")))
+            .await
+            .map_err(|_| Error::InvalidResponse("Connection timeout".to_string()))?
+            .map_err(|e| Error::InvalidResponse(format!("Connection failed: {e}")))?;
+
+        let io = TokioIo::new(tcp_stream);
+
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await.map_err(Error::Http)?;
+
+        tokio::task::spawn(async move {
+            if let Err(err) = conn.await {
+                eprintln!("Connection error: {err}");
+            }
+        });
+
+        let uri = entity_url.as_str().parse::<Uri>()?;
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .header("host", host)
+            .header("user-agent", &self.config.user_agent)
+            .header("content-type", "application/json")
+            .body(Empty::<Bytes>::new())
+            .map_err(Error::HttpError)?;
+
+        let res = tokio::time::timeout(self.config.timeout, sender.send_request(req))
+            .await
+            .map_err(|_| Error::InvalidResponse("Request timeout".to_string()))?
+            .map_err(Error::Http)?;
+
+        if !res.status().is_success() {
+            return Err(Error::InvalidResponse(format!(
+                "HTTP {}: {}",
+                res.status().as_u16(),
+                res.status().canonical_reason().unwrap_or("Unknown error")
+            )));
+        }
+
+        let body = res.into_body().collect().await?.to_bytes();
+        let response: T = serde_json::from_slice(&body)?;
+
+        Ok(response)
     }
 
     #[cfg(feature = "openssl")]
@@ -314,5 +407,83 @@ impl Client {
         let version_response: VersionResponse<T> = serde_json::from_slice(&body)?;
 
         Ok(version_response)
+    }
+
+    #[cfg(feature = "openssl")]
+    async fn make_tls_entity_request<T>(
+        &self,
+        host: &str,
+        port: u16,
+        entity_url: url::Url,
+    ) -> Result<T, Error>
+    where
+        T: for<'de> serde::Deserialize<'de>,
+    {
+        let ssl_connector = match &self.config.ssl_connector {
+            Some(connector) => connector.clone(),
+            None => {
+                SslConnector::builder(SslMethod::tls_client())
+                    .map_err(|e| Error::InvalidResponse(format!("Failed to create SSL connector: {e}")))?
+                    .build()
+            }
+        };
+
+        let tcp_stream = tokio::time::timeout(self.config.timeout, TcpStream::connect(format!("{host}:{port}")))
+            .await
+            .map_err(|_| Error::InvalidResponse("Connection timeout".to_string()))?
+            .map_err(|e| Error::InvalidResponse(format!("Connection failed: {e}")))?;
+
+        let ssl_config = ssl_connector
+            .configure()
+            .map_err(|e| Error::InvalidResponse(format!("Failed to configure SSL: {e}")))?
+            .into_ssl(host)
+            .map_err(|e| Error::InvalidResponse(format!("Failed to create SSL context: {e}")))?;
+
+        let mut ssl_stream = SslStream::new(ssl_config, tcp_stream)
+            .map_err(|e| Error::InvalidResponse(format!("Failed to create SSL stream: {e}")))?;
+
+        use std::pin::Pin;
+        Pin::new(&mut ssl_stream)
+            .connect()
+            .await
+            .map_err(|e| Error::InvalidResponse(format!("TLS handshake failed: {e}")))?;
+
+        let io = TokioIo::new(ssl_stream);
+
+        let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await.map_err(Error::Http)?;
+
+        tokio::task::spawn(async move {
+            if let Err(err) = conn.await {
+                eprintln!("Connection error: {err}");
+            }
+        });
+
+        let uri = entity_url.as_str().parse::<Uri>()?;
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .header("host", host)
+            .header("user-agent", &self.config.user_agent)
+            .header("content-type", "application/json")
+            .body(Empty::<Bytes>::new())
+            .map_err(Error::HttpError)?;
+
+        let res = tokio::time::timeout(self.config.timeout, sender.send_request(req))
+            .await
+            .map_err(|_| Error::InvalidResponse("Request timeout".to_string()))?
+            .map_err(Error::Http)?;
+
+        if !res.status().is_success() {
+            return Err(Error::InvalidResponse(format!(
+                "HTTP {}: {}",
+                res.status().as_u16(),
+                res.status().canonical_reason().unwrap_or("Unknown error")
+            )));
+        }
+
+        let body = res.into_body().collect().await?.to_bytes();
+        let response: T = serde_json::from_slice(&body)?;
+
+        Ok(response)
     }
 }

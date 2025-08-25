@@ -11,12 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use actix_web::middleware::Logger;
 use actix_web::{App, HttpServer, guard, web};
 use opensovd_models::version::VendorInfo;
-use opensovd_tracing::info;
+use tracing::info;
 
 use crate::error::{Error, Result};
+use crate::middleware::TraceLayer;
 use crate::routes;
 use crate::server_config::{Listener, ServerConfig};
 
@@ -33,10 +33,11 @@ where
         web::scope(base_path)
             .guard(guard::Header("content-type", "application/json"))
             .configure(routes::version::configure::<T>)
+            .configure(routes::hello::configure)
             .service(
                 web::scope("v1")
                     .configure(routes::entity::configure)
-                    .configure(routes::data::configure)
+                    .configure(routes::data::configure),
             ),
     );
 }
@@ -73,15 +74,17 @@ where
         let diagnostic = self.config.diagnostic.clone();
 
         let server_builder = HttpServer::new(move || {
-            let app = App::new()
+            let app = App::new();
+            
+            let app = app.wrap(TraceLayer::http())
                 .app_data(web::Data::new(routes::BaseUri(base_uri.clone())))
                 .app_data(web::Data::new(vendor_info.clone()))
-                .app_data(web::Data::from(diagnostic.clone()))
-                .wrap(Logger::default());
+                .app_data(web::Data::from(diagnostic.clone()));
 
             let app = app.configure(|cfg| configure::<T>(cfg, &uri_path));
             #[cfg(feature = "ui")]
             let app = app.configure(routes::ui::configure);
+            let app = app.configure(routes::metrics::configure);
             app
         });
 

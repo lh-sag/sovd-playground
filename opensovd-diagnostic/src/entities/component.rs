@@ -16,7 +16,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::resources::Resource;
+use crate::resources::{Resource, data::DataResource};
 
 /// A Component represents a diagnostic entity with an id, name, and resource
 #[derive(Debug)]
@@ -36,53 +36,6 @@ impl Component {
         }
     }
 
-    /// Creates a new component with the given id, name, and resource
-    ///
-    /// This is a convenience method for creating a component that already has
-    /// a configured resource, avoiding the need to create the component first and
-    /// then set the resource separately.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique identifier for the component
-    /// * `name` - Human-readable name for the component
-    /// * `resource` - A Resource instance to be used by this component
-    ///
-    /// # Returns
-    ///
-    /// A new Component instance with the specified id, name, and resource
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use opensovd_diagnostic::entities::Component;
-    /// # use opensovd_diagnostic::resources::{Resource, HashMapDataResource};
-    /// # use opensovd_models::data::StringDataCategory;
-    /// # use serde_json::json;
-    /// let mut engine_data = HashMapDataResource::new();
-    /// engine_data.add_data_item_with_metadata(
-    ///     "rpm".to_string(),
-    ///     "Engine RPM".to_string(),
-    ///     StringDataCategory::CurrentData,
-    ///     vec!["engine".to_string()],
-    ///     vec!["rpm".to_string()],
-    ///     json!({"value": 2500, "unit": "rpm"}),
-    ///     false
-    /// );
-    ///
-    /// let component = Component::new_with_resources(
-    ///     "engine".to_string(),
-    ///     "Engine ECU".to_string(),
-    ///     Resource::with_data_resource(engine_data)
-    /// );
-    ///
-    /// assert_eq!(component.id(), "engine");
-    /// assert_eq!(component.name(), "Engine ECU");
-    /// assert!(component.resource().has_data_resource());
-    /// ```
-    pub fn new_with_resources(id: String, name: String, resource: Resource) -> Self {
-        Self { id, name, resource }
-    }
 }
 
 impl Component {
@@ -104,5 +57,9 @@ impl Component {
     /// Gets mutable access to the component's resource
     pub fn resource_mut(&mut self) -> &mut Resource {
         &mut self.resource
+    }
+
+    pub fn data_resource(&mut self, data_resource: Box<dyn DataResource>) {
+        self.resource = Resource::with_data_resource(data_resource);
     }
 }
