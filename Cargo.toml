@@ -9,8 +9,10 @@ members = [
 resolver = "2"
 
 [workspace.package]
-authors = ["Sanimir Agovic <sanimig.agovic@liebherr.com>"]
-description = "SOVD (ISO 17978) implementation"
+authors = [
+    "Sanimir Agovic <sanimig.agovic@liebherr.com>",
+]
+description = "SOVD (ISO 17978) toolbox"
 edition = "2024"
 homepage = "https://projects.eclipse.org/projects/automotive.opensovd"
 license = "Apache-2.0"
@@ -21,10 +23,14 @@ version = "0.0.1"
 [workspace.dependencies]
 opensovd-models = { version = "0.0.1", path = "opensovd-models" }
 opensovd-diagnostic = { version = "0.0.1", path = "opensovd-diagnostic" }
-
 opensovd-client = { version = "0.0.1", path = "opensovd-client" }
 opensovd-server = { version = "0.0.1", path = "opensovd-server" }
-
+tracing-log = { version = "0.2.0", default-features = false, features = [
+    "log-tracer",
+] }
+log = { version = "0.4", default-features = false, features = [
+    "std",
+] }
 serde = { version = "1.0.219", default-features = false, features = [
     "derive",
     "alloc",
@@ -43,10 +49,8 @@ clap = { version = "4.5.42", default-features = false, features = [
 tokio = { version = "1.47.0", features = [
     "net",
     "rt",
-    "rt-multi-thread",
     "signal",
     "time",
-    "macros",
 ], default-features = false }
 actix-web = { version = "4.9.0", default-features = false, features = [
     "macros",
@@ -57,15 +61,15 @@ tracing-subscriber = { version = "0.3.19", features = [
     "alloc",
     "fmt",
 ], default-features = false }
-tracing-log = { version = "0.2.0", default-features = false, features = ["log-tracer"] }
-log = { version = "0.4", default-features = false, features = ["std"] }
 openssl = { version = "0.10.73", default-features = false }
 futures-core = { version = "0.3.31", default-features = false, features = [
     "alloc",
 ] }
 derive_more = { version = "2.0", default-features = false }
 
-http = { version = "1.1", default-features = false, features = ["std"] }
+http = { version = "1.1", default-features = false, features = [
+    "std",
+] }
 schemars = { version = "1.0.4", default-features = false }
 hyper = { version = "1.7.0", default-features = false }
 hyper-util = { version = "0.1.16", default-features = false }
@@ -74,13 +78,21 @@ url = { version = "2.5", default-features = false }
 urlencoding = { version = "2.1", default-features = false }
 hyper-openssl = { version = "0.10", default-features = false }
 tokio-openssl = { version = "0.6", default-features = false }
-toml = { version = "0.8", default-features = false, features = ["parse"] }
-once_cell = { version = "1.19", default-features = false, features = ["std"] }
+toml = { version = "0.8", default-features = false, features = [
+    "parse",
+] }
+once_cell = { version = "1.19", default-features = false, features = [
+    "std",
+] }
 prometheus = { version = "0.13", default-features = false }
-opentelemetry = { version = "0.24", default-features = false, features = ["metrics", "trace"] }
-opentelemetry_sdk = { version = "0.24", default-features = false, features = ["metrics", "rt-tokio"] }
-opentelemetry-prometheus = { version = "0.17", default-features = false }
-opentelemetry-otlp = { version = "0.17", default-features = false, features = ["metrics", "grpc-tonic", "tonic"] }
+opentelemetry = { version = "0.24", default-features = false, features = [
+    "metrics",
+    "trace",
+] }
+jsonwebtoken = { version = "9", default-features = false, features = [
+    "use_pem",
+] }
+
 
 [profile.release]
 codegen-units = 1

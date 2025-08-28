@@ -50,7 +50,7 @@ async fn list_data_resources(
     let data_resource = data_resource_lock.read().await;
     let categories = query.categories.unwrap_or_default();
     let groups = query.groups.unwrap_or_default();
-    let data_items = data_resource.list_data_items(&categories, &groups);
+    let data_items = data_resource.list_data_items(&categories, &groups).await;
     let items = data_items_to_resource_items(data_items);
     let response = DataResourceResponse { items };
 
@@ -73,7 +73,7 @@ async fn get_data_value(
         crate::response::ApiError::not_found(format!("Component '{component_id}' has no data resources"))
     })?;
     let data_resource = data_resource_lock.read().await;
-    let response = match data_resource.read_data(&data_id) {
+    let response = match data_resource.read_data(&data_id).await {
         Ok(data) => DataValueResponse {
             id: data_id,
             data,
@@ -112,7 +112,7 @@ async fn set_data_value(
         crate::response::ApiError::not_found(format!("Component '{component_id}' has no data resources"))
     })?;
     let mut data_resource = data_resource_lock.write().await;
-    match data_resource.write_data(&data_id, write_request.data) {
+    match data_resource.write_data(&data_id, write_request.data).await {
         Ok(()) => {
             Ok(HttpResponse::NoContent().finish())
         }

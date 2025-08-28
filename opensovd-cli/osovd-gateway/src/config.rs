@@ -10,31 +10,43 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-
 use std::path::Path;
 
 use opensovd_diagnostic::{Diagnostic, resources::data::DataItem};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "config")]
-use crate::hashmap_data_resource::{HashMapDataResource, DataValue};
+#[cfg(feature = "config-entities")]
+use crate::hashmap_data_resource::{DataValue, HashMapDataResource};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub server: ServerConfig,
+    pub auth: Option<AuthConfig>,
+    #[serde(default)]
     pub components: Vec<ComponentConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ServerConfig {
     pub name: String,
-    pub default_path: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AuthConfig {
+    pub jwt: Option<JwtConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct JwtConfig {
+    pub public_key_path: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComponentConfig {
-    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub name: String,
+    #[serde(default)]
     pub data: Vec<DataItemConfig>,
 }
 
@@ -52,8 +64,7 @@ pub struct DataItemConfig {
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let contents = std::fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&contents)?;
-        Ok(config)
+        Self::from_str(&contents)
     }
 
     pub fn from_str(contents: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -64,40 +75,71 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        const EMBEDDED_CONFIG: &str = include_str!("../config.toml");
-        Self::from_str(EMBEDDED_CONFIG).expect("Embedded config should be valid")
+        Config {
+            server: ServerConfig {
+                name: "OpenSOVD Gateway".to_string(),
+            },
+            auth: None,
+            components: vec![],
+        }
     }
 }
 
 impl Config {
-    /// Build diagnostic from configuration
+    /// Returns the embedded/builtin configuration from config.toml
+    pub fn builtin() -> Self {
+        const EMBEDDED_CONFIG: &str = include_str!("../config.toml");
+        Self::from_str(EMBEDDED_CONFIG).expect("Embedded config should be valid")
+    }
+
     pub fn build_diagnostic(self) -> Result<Diagnostic, Box<dyn std::error::Error>> {
         let mut builder = Diagnostic::builder();
 
-        for component_cfg in self.components {
-            let mut data_resource = HashMapDataResource::new();
+        #[cfg(feature = "config-entities")]
+        {
+            for component_cfg in self.components {
+                let mut data_resource = HashMapDataResource::new();
 
-            for data_cfg in component_cfg.data {
-                let metadata = DataItem {
-                    id: data_cfg.id,
-                    name: data_cfg.name,
-                    category: data_cfg.category,
-                    groups: data_cfg.groups,
-                    tags: data_cfg.tags,
+                for data_cfg in component_cfg.data {
+                    let metadata = DataItem {
+                        id: data_cfg.id,
+                        name: data_cfg.name,
+                        category: data_cfg.category,
+                        groups: data_cfg.groups,
+                        tags: data_cfg.tags,
+                    };
+                    let data_value = DataValue {
+                        value: data_cfg.value,
+                        metadata,
+                        read_only: !data_cfg.writable,
+                    };
+                    data_resource.insert(data_value);
+                }
+
+                // Start building component with name
+                let component_builder = builder.component(component_cfg.name);
+                
+                // Only call .id() if explicitly provided in config
+                let component_builder = if let Some(id) = component_cfg.id {
+                    component_builder.id(id)
+                } else {
+                    component_builder  // Use auto-generated ID
                 };
-                let data_value = DataValue {
-                    value: data_cfg.value,
-                    metadata,
-                    read_only: !data_cfg.writable,
-                };
-                data_resource.insert(data_value);
+                
+                builder = component_builder
+                    .data_resource(data_resource)
+                    .add()?;
             }
+        }
 
-            builder = builder
-                .component(component_cfg.name)
-                .id(component_cfg.id)
-                .data_resource(data_resource)
-                .add()?;
+        #[cfg(not(feature = "config-entities"))]
+        {
+            if !self.components.is_empty() {
+                tracing::debug!(
+                    "Ignoring {} components (config-entities feature disabled)",
+                    self.components.len()
+                );
+            }
         }
 
         Ok(builder.build())

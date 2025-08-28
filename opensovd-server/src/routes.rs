@@ -13,7 +13,6 @@
 
 pub(crate) mod data;
 pub(crate) mod entity;
-pub(crate) mod hello;
 pub(crate) mod metrics;
 #[cfg(feature = "ui")]
 pub(crate) mod ui;

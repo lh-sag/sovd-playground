@@ -2,11 +2,13 @@
 
 [server]
 name = "OpenSOVD Gateway"
-default_path = "/opensovd"
+
+# Authentication configuration (optional)
+# [auth.jwt]
+# public_key_path = "./path/to/public_key.pem"
 
 # Engine Controller Component
 [[components]]
-id = "engine-controller"
 name = "Engine Control Unit"
 
 # Standard ISO 17978-3 current data
@@ -14,8 +16,13 @@ name = "Engine Control Unit"
 id = "temperature"
 name = "Engine Temperature"
 category = "currentData"
-groups = ["engine", "temperature"]
-tags = ["celsius"]
+groups = [
+    "engine",
+    "temperature",
+]
+tags = [
+    "celsius",
+]
 value = { value = 90.5, unit = "celsius" }
 writable = true
 
@@ -23,8 +30,13 @@ writable = true
 id = "rpm"
 name = "Engine RPM"
 category = "currentData"
-groups = ["engine", "performance"]
-tags = ["rpm"]
+groups = [
+    "engine",
+    "performance",
+]
+tags = [
+    "rpm",
+]
 value = { value = 2500, unit = "rpm" }
 writable = true
 
@@ -32,8 +44,13 @@ writable = true
 id = "oil_pressure"
 name = "Oil Pressure"
 category = "currentData"
-groups = ["engine", "fluids"]
-tags = ["pressure"]
+groups = [
+    "engine",
+    "fluids",
+]
+tags = [
+    "pressure",
+]
 value = { value = 45, unit = "psi" }
 writable = true
 
@@ -42,41 +59,62 @@ writable = true
 id = "serial_number"
 name = "Engine Serial Number"
 category = "identData"
-groups = ["engine", "identification"]
-tags = ["serial"]
+groups = [
+    "engine",
+    "identification",
+]
+tags = [
+    "serial",
+]
 value = "ENG-2024-001"
 writable = false
 
-# Vendor-specific Caterpillar extensions
+# Vendor-specific Liebherr extensions
 [[components.data]]
 id = "turbo_boost"
 name = "Turbocharger Boost Pressure"
-category = "x-caterpillar-engine"
-groups = ["engine", "turbo"]
-tags = ["pressure", "boost"]
+category = "x-liebherr-engine"
+groups = [
+    "engine",
+    "turbo",
+]
+tags = [
+    "pressure",
+    "boost",
+]
 value = { value = 18.5, unit = "psi", max = 25.0 }
 writable = true
 
 [[components.data]]
 id = "def_level"
 name = "Diesel Exhaust Fluid Level"
-category = "x-caterpillar-aftertreatment"
-groups = ["engine", "aftertreatment"]
-tags = ["def", "fluid"]
+category = "x-liebherr-aftertreatment"
+groups = [
+    "engine",
+    "aftertreatment",
+]
+tags = [
+    "def",
+    "fluid",
+]
 value = { level = 75, unit = "percent" }
 writable = true
 
 # Transmission Controller Component
 [[components]]
-id = "transmission-controller"
 name = "Transmission Control Module"
 
 [[components.data]]
 id = "gear"
 name = "Current Gear"
 category = "currentData"
-groups = ["transmission", "gearing"]
-tags = ["gear"]
+groups = [
+    "transmission",
+    "gearing",
+]
+tags = [
+    "gear",
+]
 value = { current = 3, max = 6 }
 writable = true
 
@@ -84,8 +122,13 @@ writable = true
 id = "fluid_temp"
 name = "Transmission Fluid Temperature"
 category = "currentData"
-groups = ["transmission", "fluids"]
-tags = ["temperature"]
+groups = [
+    "transmission",
+    "fluids",
+]
+tags = [
+    "temperature",
+]
 value = { value = 75, unit = "celsius" }
 writable = true
 
@@ -93,8 +136,13 @@ writable = true
 id = "shift_mode"
 name = "Shift Mode"
 category = "currentData"
-groups = ["transmission", "control"]
-tags = ["mode"]
+groups = [
+    "transmission",
+    "control",
+]
+tags = [
+    "mode",
+]
 value = "automatic"
 writable = true
 
@@ -102,8 +150,13 @@ writable = true
 id = "part_number"
 name = "Transmission Part Number"
 category = "identData"
-groups = ["transmission", "identification"]
-tags = ["part"]
+groups = [
+    "transmission",
+    "identification",
+]
+tags = [
+    "part",
+]
 value = "TRANS-X900-2024"
 writable = false
 
@@ -112,14 +165,19 @@ writable = false
 id = "torque_converter_lockup"
 name = "Torque Converter Lockup Status"
 category = "x-allison-transmission"
-groups = ["transmission", "torque-converter"]
-tags = ["lockup", "status"]
+groups = [
+    "transmission",
+    "torque-converter",
+]
+tags = [
+    "lockup",
+    "status",
+]
 value = { locked = true, slip_rpm = 25 }
 writable = true
 
 # Hydraulics Controller Component
 [[components]]
-id = "hydraulics-controller"
 name = "Hydraulic Control System"
 
 # Vendor-specific Liebherr hydraulics
@@ -127,8 +185,14 @@ name = "Hydraulic Control System"
 id = "main_pressure"
 name = "Main Hydraulic System Pressure"
 category = "x-liebherr-hydraulics"
-groups = ["hydraulics", "pressure"]
-tags = ["main", "system"]
+groups = [
+    "hydraulics",
+    "pressure",
+]
+tags = [
+    "main",
+    "system",
+]
 value = { value = 350, unit = "bar", max = 420 }
 writable = true
 
@@ -136,8 +200,14 @@ writable = true
 id = "pilot_pressure"
 name = "Pilot Control Pressure"
 category = "x-liebherr-hydraulics"
-groups = ["hydraulics", "pilot"]
-tags = ["pilot", "control"]
+groups = [
+    "hydraulics",
+    "pilot",
+]
+tags = [
+    "pilot",
+    "control",
+]
 value = { value = 28, unit = "bar", target = 30 }
 writable = true
 
@@ -145,8 +215,14 @@ writable = true
 id = "boom_position"
 name = "Boom Cylinder Position"
 category = "x-liebherr-construction"
-groups = ["hydraulics", "boom"]
-tags = ["position", "cylinder"]
+groups = [
+    "hydraulics",
+    "boom",
+]
+tags = [
+    "position",
+    "cylinder",
+]
 value = { extension = 65, unit = "percent" }
 writable = true
 
@@ -154,8 +230,13 @@ writable = true
 id = "fluid_temperature"
 name = "Hydraulic Fluid Temperature"
 category = "currentData"
-groups = ["hydraulics", "fluids"]
-tags = ["temperature"]
+groups = [
+    "hydraulics",
+    "fluids",
+]
+tags = [
+    "temperature",
+]
 value = { value = 45, unit = "celsius", warning_threshold = 80 }
 writable = true
 
@@ -163,7 +244,13 @@ writable = true
 id = "pump_model"
 name = "Hydraulic Pump Model"
 category = "identData"
-groups = ["hydraulics", "pump"]
-tags = ["model", "identification"]
+groups = [
+    "hydraulics",
+    "pump",
+]
+tags = [
+    "model",
+    "identification",
+]
 value = "LH-PUMP-350-V2"
 writable = false

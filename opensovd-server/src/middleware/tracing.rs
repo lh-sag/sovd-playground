@@ -18,10 +18,11 @@ use std::pin::Pin;
 
 use actix_web::Error;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready};
-use tracing::Instrument;
+
+const TARGET: &str = "srv::http";
 
 #[derive(Debug, Clone, Default)]
-pub struct Tracing;
+pub(crate) struct Tracing;
 
 impl Tracing {
     pub fn new() -> Self {
@@ -46,7 +47,7 @@ where
     }
 }
 
-pub struct TracingService<S> {
+pub(crate) struct TracingService<S> {
     service: S,
 }
 
@@ -65,46 +66,37 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let method = req.method().to_string();
         let path = req.path().to_string();
-
-        let span = tracing::info_span!(
-            "req",
-            method = %method,
-            path = %path,
-            status_code = tracing::field::Empty,
-            latency = tracing::field::Empty,
-        );
-
-        let _enter = span.enter();
-        drop(_enter);
-
         let fut = self.service.call(req);
-        let span_clone = span.clone();
 
-        Box::pin(
-            async move {
-                let start = std::time::Instant::now();
-                let result = fut.await;
-                let latency = start.elapsed();
+        Box::pin(async move {
+            let start = std::time::Instant::now();
+            let result = fut.await;
+            let elapsed = start.elapsed();
 
-                match &result {
-                    Ok(response) => {
-                        let status = response.status();
-                        span_clone.record("status_code", status.as_u16());
-                        span_clone.record("latency", format!("{:?}", latency));
-                    }
-                    Err(err) => {
-                        let status_code = err.as_response_error().status_code().as_u16();
-                        span_clone.record("status_code", status_code);
-                        span_clone.record("latency", format!("{:?}", latency));
-                        tracing::error!(
-                            latency = ?latency,
-                            error = %err,
-                        );
-                    }
+            match &result {
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    tracing::info!(
+                        target: TARGET,
+                        method = %method,
+                        path = %path,
+                        status_code = status,
+                        elapsed = format!("{:?}", elapsed)
+                    );
                 }
-                result
+                Err(err) => {
+                    let status = err.as_response_error().status_code().as_u16();
+                    tracing::error!(
+                        target: TARGET,
+                        method = %method,
+                        path = %path,
+                        status_code = status,
+                        elapsed = format!("{:?}", elapsed),
+                        error = %err
+                    );
+                }
             }
-            .instrument(span),
-        )
+            result
+        })
     }
 }

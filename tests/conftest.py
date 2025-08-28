@@ -15,16 +15,23 @@
 Pytest configuration and fixtures for osovd-gateway integration tests.
 """
 
+import base64
 import contextlib
+import json
 import re
 import subprocess
 import time
+import os
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 import sh
 from sh import ErrorReturnCode
+from pytest_httpserver import HTTPServer
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 _DEFAULT_URL = "http://127.0.0.1:0/opensovd"
 
@@ -167,7 +174,6 @@ class GatewayManager:
         """
         cmd_args = args or []
         process_env = env or {}
-
         try:
             if self.binary_path:
                 # Use pre-built binary
@@ -175,7 +181,7 @@ class GatewayManager:
                 self.process = cmd(
                     *cmd_args,
                     _cwd=self.project_root,
-                    _env=process_env,
+                    _env=os.environ,
                     _bg=True,
                     _bg_exc=False,
                     _iter=True,
@@ -325,3 +331,97 @@ def gateway(
     gateway_manager.start(args=gateway_args, env=gateway_env)
     yield gateway_manager
     gateway_manager.stop()
+
+
+class JWTTestHelper:
+    """Helper class for JWT and JWKS testing."""
+    
+    def __init__(self, private_key, public_key, jwks_url: str, kid: str = "test-key-1"):
+        self.private_key = private_key
+        self.public_key = public_key
+        self.jwks_url = jwks_url
+        self.kid = kid
+    
+    def create_jwt(self, payload: dict | None = None, headers: dict | None = None) -> str:
+        """Create a JWT token with the test key."""
+        import jwt
+        
+        # Default payload
+        default_payload = {
+            "sub": "test-user",
+            "aud": "sovd-gateway",
+            "iss": "https://auth.example.com",
+            "exp": int(time.time()) + 3600,  # 1 hour from now
+            "iat": int(time.time()),
+            "roles": ["admin"],
+            "scopes": ["read", "write"]
+        }
+        if payload:
+            default_payload.update(payload)
+            
+        # Default headers
+        default_headers = {"kid": self.kid}
+        if headers:
+            default_headers.update(headers)
+            
+        return jwt.encode(
+            default_payload,
+            self.private_key,
+            algorithm="RS256",
+            headers=default_headers
+        )
+
+
+@pytest.fixture(scope="module")
+def jwks_server() -> Generator[JWTTestHelper, None, None]:
+    """
+    Fixture that provides a mock JWKS server and JWT token helper.
+    
+    Returns a JWTTestHelper instance with:
+    - jwks_url: URL to the mock JWKS endpoint
+    - create_jwt(): method to create test JWT tokens
+    """
+    # Generate RSA key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    
+    # Extract RSA components for JWKS
+    public_numbers = public_key.public_numbers()
+    
+    def int_to_base64url(val: int) -> str:
+        """Convert integer to base64url encoding."""
+        byte_length = (val.bit_length() + 7) // 8
+        val_bytes = val.to_bytes(byte_length, byteorder='big')
+        return base64.urlsafe_b64encode(val_bytes).decode('ascii').rstrip('=')
+    
+    n_b64 = int_to_base64url(public_numbers.n)
+    e_b64 = int_to_base64url(public_numbers.e)
+    
+    # Create JWKS response
+    jwks_response = {
+        "keys": [
+            {
+                "kty": "RSA",
+                "kid": "test-key-1",
+                "use": "sig", 
+                "alg": "RS256",
+                "n": n_b64,
+                "e": e_b64
+            }
+        ]
+    }
+    
+    # Start HTTP server
+    httpserver = HTTPServer(host="127.0.0.1", port=0)
+    httpserver.expect_request("/.well-known/jwks.json").respond_with_json(jwks_response)
+    httpserver.start()
+    
+    try:
+        jwks_url = f"http://127.0.0.1:{httpserver.port}/.well-known/jwks.json"
+        print(f"URL: {jwks_url}")
+        yield JWTTestHelper(private_key, public_key, jwks_url)
+    finally:
+        httpserver.stop()

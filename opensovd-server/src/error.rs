@@ -22,8 +22,14 @@ pub enum Error {
     InvalidUri(http::uri::InvalidUri),
 
     #[display("Bad configuration: {}", _0)]
+    #[from(ignore)]
     #[error(ignore)]
     BadConfiguration(String),
+
+    #[display("Authentication setup failed: {}", _0)]
+    #[from(ignore)]
+    #[error(ignore)]
+    AuthSetupFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

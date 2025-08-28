@@ -12,11 +12,29 @@ version = { workspace = true }
 authors = { workspace = true }
 
 [features]
-default = ["jsonschema-schemars", "openssl"]
-config = ["dep:toml"]
-ui = ["opensovd-server/ui"]
-jsonschema-schemars = ["schemars/derive", "opensovd-models/jsonschema-schemars"]
-openssl = ["opensovd-client/openssl", "opensovd-server/openssl", "dep:openssl"]
+default = [
+    "jsonschema-schemars",
+    "openssl",
+    "config-entities",
+]
+config = [
+    "dep:toml",
+]
+config-entities = [
+    "config",
+]
+ui = [
+    "opensovd-server/ui",
+]
+jsonschema-schemars = [
+    "schemars/derive",
+    "opensovd-models/jsonschema-schemars",
+]
+openssl = [
+    "opensovd-client/openssl",
+    "opensovd-server/openssl",
+    "dep:openssl",
+]
 
 [[bin]]
 name = "osovd-gateway"
@@ -34,22 +52,26 @@ path = "libosovd/src/lib.rs"
 clap = { workspace = true }
 opensovd-client = { workspace = true }
 opensovd-diagnostic = { workspace = true }
-opensovd-server = { workspace = true, features = ["openssl"] }
+opensovd-server = { workspace = true, features = [
+    "openssl",
+] }
 opensovd-models = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = [
+    "macros",
+] }
 http = { workspace = true }
 openssl = { workspace = true, optional = true }
 serde_json = { workspace = true }
-url = "2.5"
-urlencoding = "2.1"
 serde = { workspace = true }
 schemars = { workspace = true, optional = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = [
-    "smallvec",
+tracing-subscriber = { workspace = true }
+toml = { workspace = true, optional = true }
+url = "2.5"
+urlencoding = "2.1"
+derive_more = { workspace = true, features = [
+    "display",
+    "from",
 ] }
 tracing-log = { workspace = true }
 log = { workspace = true }
-toml = { workspace = true, optional = true }
-
-derive_more = { workspace = true, features = ["display", "from"] }

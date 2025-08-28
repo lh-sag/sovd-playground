@@ -15,12 +15,11 @@
 //!
 //! This module provides HTTP middleware layers for request processing, including:
 //! - Request tracing and logging
-//! - Authentication and authorization 
+//! - Authentication and authorization
 //! - Request/response transformation
 //! - Error handling and recovery
 //!
 //! The middleware is designed to be composable and follows Actix Web middleware patterns.
 
-pub mod tracing;
-
-pub use tracing::Tracing;
+pub(crate) mod auth;
+pub(crate) mod tracing;

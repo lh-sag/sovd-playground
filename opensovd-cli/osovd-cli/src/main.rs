@@ -16,9 +16,9 @@ use clap::{Parser, Subcommand};
 use libosovd::SslArgs;
 use opensovd_client::Client;
 use opensovd_client::ClientConfig;
-use tracing::info;
 #[cfg(feature = "openssl")]
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use tracing::info;
 
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
 
@@ -69,7 +69,7 @@ enum ComponentsAction {
     },
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().compact().init();
 
@@ -98,50 +98,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        Commands::Components { ref action } => {
-            match action {
-                ComponentsAction::List { uri } => {
-                    let client = match create_client(&args, uri) {
-                        Ok(client) => client,
-                        Err(e) => {
-                            eprintln!("Error creating client: {e}");
-                            std::process::exit(1);
-                        }
-                    };
-                    
-                    match client.components().await {
-                        Ok(response) => {
-                            let json = serde_json::to_string_pretty(&response)?;
-                            println!("{json}");
-                        }
-                        Err(e) => {
-                            eprintln!("Error listing components: {e}");
-                            std::process::exit(1);
-                        }
+        Commands::Components { ref action } => match action {
+            ComponentsAction::List { uri } => {
+                let client = match create_client(&args, uri) {
+                    Ok(client) => client,
+                    Err(e) => {
+                        eprintln!("Error creating client: {e}");
+                        std::process::exit(1);
                     }
-                }
-                ComponentsAction::Get { id, uri } => {
-                    let client = match create_client(&args, uri) {
-                        Ok(client) => client,
-                        Err(e) => {
-                            eprintln!("Error creating client: {e}");
-                            std::process::exit(1);
-                        }
-                    };
-                    
-                    match client.component_capabilities(id).await {
-                        Ok(response) => {
-                            let json = serde_json::to_string_pretty(&response)?;
-                            println!("{json}");
-                        }
-                        Err(e) => {
-                            eprintln!("Error getting component capabilities: {e}");
-                            std::process::exit(1);
-                        }
+                };
+
+                match client.components().await {
+                    Ok(response) => {
+                        let json = serde_json::to_string_pretty(&response)?;
+                        println!("{json}");
+                    }
+                    Err(e) => {
+                        eprintln!("Error listing components: {e}");
+                        std::process::exit(1);
                     }
                 }
             }
-        }
+            ComponentsAction::Get { id, uri } => {
+                let client = match create_client(&args, uri) {
+                    Ok(client) => client,
+                    Err(e) => {
+                        eprintln!("Error creating client: {e}");
+                        std::process::exit(1);
+                    }
+                };
+
+                match client.component_capabilities(id).await {
+                    Ok(response) => {
+                        let json = serde_json::to_string_pretty(&response)?;
+                        println!("{json}");
+                    }
+                    Err(e) => {
+                        eprintln!("Error getting component capabilities: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+        },
     }
 
     info!("OpenSOVD CLI client finished successfully");

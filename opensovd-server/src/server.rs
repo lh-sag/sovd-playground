@@ -16,30 +16,15 @@ use opensovd_models::version::VendorInfo;
 use tracing::info;
 
 use crate::error::{Error, Result};
-use crate::middleware::Tracing;
+use crate::middleware::{auth::BearerAuth, tracing::Tracing};
 use crate::routes;
 use crate::server_config::{Listener, ServerConfig};
+
+const TARGET: &str = "srv";
 
 /// The main OpenSOVD HTTP Server structure.
 pub struct Server<T = VendorInfo> {
     config: ServerConfig<T>,
-}
-
-fn configure<T>(cfg: &mut web::ServiceConfig, base_path: &str)
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + schemars::JsonSchema + Clone + Send + Sync + 'static,
-{
-    cfg.service(
-        web::scope(base_path)
-            .guard(guard::Header("content-type", "application/json"))
-            .configure(routes::version::configure::<T>)
-            .configure(routes::hello::configure)
-            .service(
-                web::scope("v1")
-                    .configure(routes::entity::configure)
-                    .configure(routes::data::configure),
-            ),
-    );
 }
 
 impl<T> Server<T>
@@ -66,22 +51,46 @@ where
     /// Returns `Ok(())` if the server shuts down gracefully, or an error if
     /// the server fails to start or encounters an error during operation.
     pub async fn start(self) -> Result<()> {
-        info!("Starting OpenSOVD server");
+        info!(target: TARGET, "Starting OpenSOVD server");
 
         let uri_path = self.config.uri_path.trim_end_matches('/').to_string();
         let base_uri = self.config.uri_path.clone();
         let vendor_info = self.config.vendor_info.clone();
         let diagnostic = self.config.diagnostic.clone();
 
+        // Setup authentication middleware if configured
+        let auth_middleware = if let Some(auth_info) = self.config.auth {
+            let bearer_auth = BearerAuth::from_rsa_pem(&auth_info.public_key_pem)
+                .map_err(|e| Error::AuthSetupFailed(format!("Failed to create bearer auth: {}", e)))?;
+            Some(bearer_auth)
+        } else {
+            None
+        };
+
         let server_builder = HttpServer::new(move || {
-            let app = App::new();
-            
-            let app = app.wrap(Tracing::new())
+            let app = App::new()
+                .wrap(Tracing::new())
                 .app_data(web::Data::new(routes::BaseUri(base_uri.clone())))
                 .app_data(web::Data::new(vendor_info.clone()))
                 .app_data(web::Data::from(diagnostic.clone()));
 
-            let app = app.configure(|cfg| configure::<T>(cfg, &uri_path));
+            let base_scope = web::scope(&uri_path)
+                .guard(guard::Header("content-type", "application/json"))
+                .configure(routes::version::configure::<T>);
+
+            // Create v1 scope with conditional auth
+            let app = if let Some(ref auth) = auth_middleware {
+                let v1_scope = web::scope("v1")
+                    .wrap(auth.clone())
+                    .configure(routes::entity::configure)
+                    .configure(routes::data::configure);
+                app.service(base_scope.service(v1_scope))
+            } else {
+                let v1_scope = web::scope("v1")
+                    .configure(routes::entity::configure)
+                    .configure(routes::data::configure);
+                app.service(base_scope.service(v1_scope))
+            };
             #[cfg(feature = "ui")]
             let app = app.configure(routes::ui::configure);
             let app = app.configure(routes::metrics::configure);
@@ -108,6 +117,24 @@ where
         };
         server.workers(1).run().await.map_err(Error::Io)
     }
+}
+
+#[cfg(test)]
+fn configure<T>(cfg: &mut web::ServiceConfig, base_path: &str)
+where
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + schemars::JsonSchema + Clone + Send + Sync + 'static,
+{
+    cfg.service(
+        web::scope(base_path)
+            .guard(guard::Header("content-type", "application/json"))
+            .configure(routes::version::configure::<T>)
+            .configure(routes::hello::configure)
+            .service(
+                web::scope("v1")
+                    .configure(routes::entity::configure)
+                    .configure(routes::data::configure),
+            ),
+    );
 }
 
 #[cfg(test)]

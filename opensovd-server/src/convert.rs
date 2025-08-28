@@ -27,7 +27,7 @@ use opensovd_models::error::{ErrorCode, GenericError};
 use crate::response::ApiError;
 
 /// Convert diagnostic DataError to API DataErrorResponse
-pub fn data_error_to_response(data_error: DataError) -> DataErrorResponse {
+pub(crate) fn data_error_to_response(data_error: DataError) -> DataErrorResponse {
     // Convert our simplified DataError to appropriate ErrorCode and vendor error
     let (error_code, vendor_code, message) = match data_error {
         DataError::DataNotFound(id) => (
@@ -75,7 +75,7 @@ impl From<DataError> for ApiError {
 }
 
 /// Convert DataItem to API DataResourceItem
-pub fn data_item_to_resource_item(item: opensovd_diagnostic::resources::data::DataItem) -> DataResourceItem {
+pub(crate) fn data_item_to_resource_item(item: opensovd_diagnostic::resources::data::DataItem) -> DataResourceItem {
     DataResourceItem {
         id: item.id,
         name: item.name,
@@ -87,7 +87,7 @@ pub fn data_item_to_resource_item(item: opensovd_diagnostic::resources::data::Da
 }
 
 /// Convert multiple DataItems to API DataResourceItems
-pub fn data_items_to_resource_items(
+pub(crate) fn data_items_to_resource_items(
     items: Vec<opensovd_diagnostic::resources::data::DataItem>,
 ) -> Vec<DataResourceItem> {
     items.into_iter().map(data_item_to_resource_item).collect()

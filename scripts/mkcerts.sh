@@ -18,7 +18,7 @@
 set -e
 
 # Default parameters
-OUTPUT_DIR="${1:-./certs}"
+OUTPUT_DIR="${1:-./gen/certs}"
 VALIDITY_DAYS="${2:-3650}"  # Default 10 years
 NO_VERIFY=false
 URL="https://127.0.0.1:8443/opensovd"

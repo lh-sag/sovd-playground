@@ -18,7 +18,7 @@ use std::sync::Arc;
 use clap::Parser;
 #[cfg(not(feature = "config"))]
 use opensovd_diagnostic::Diagnostic;
-use opensovd_server::{Server, ServerConfig};
+use opensovd_server::{AuthInfo, Server, ServerConfig};
 #[cfg(feature = "openssl")]
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 use serde::{Deserialize, Serialize};
@@ -28,9 +28,13 @@ use url::Url;
 mod cli;
 #[cfg(feature = "config")]
 mod config;
+#[cfg(feature = "config-entities")]
 mod hashmap_data_resource;
 
 use libosovd::version::{ENABLED_FEATURES, VERSION};
+
+const TARGET: &str = "gw";
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
 struct OpenSovdInfo {
@@ -53,36 +57,47 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         features: ENABLED_FEATURES.iter().map(|s| s.to_string()).collect(),
     };
 
-    // Build diagnostic system
-    let diagnostic = {
-        #[cfg(feature = "config")]
-        {
-            match config::Config::from_file(&args.config) {
-                Ok(cfg) => {
-                    tracing::info!("Loading configuration from {:?}", args.config);
-                    cfg.build_diagnostic()?
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to load config from {:?}: {}. Using embedded default config.",
-                        args.config,
-                        e
-                    );
-                    config::Config::default().build_diagnostic()?
-                }
+    #[cfg(feature = "config")]
+    let (diagnostic, config_auth) = {
+        let cfg = match &args.config {
+            Some(config_path) => {
+                tracing::info!(target: TARGET,"Loading configuration from {:?}", config_path);
+                config::Config::from_file(config_path)
+                    .map_err(|e| format!("Failed to load configuration from {:?}: {}", config_path, e))?
             }
-        }
-        #[cfg(not(feature = "config"))]
-        {
-            tracing::info!("Using empty diagnostic (config feature disabled)");
-            Diagnostic::builder().build()
-        }
+            None => {
+                // No config specified, use builtin
+                tracing::info!(target: TARGET,"Using builtin configuration");
+                config::Config::builtin()
+            }
+        };
+
+        let auth = cfg
+            .auth
+            .as_ref()
+            .and_then(|a| a.jwt.as_ref())
+            .map(|jwt| jwt.public_key_path.clone());
+
+        (cfg.build_diagnostic()?, auth)
+    };
+
+    #[cfg(not(feature = "config"))]
+    let (diagnostic, config_auth) = {
+        tracing::info!(target: TARGET, "Using empty diagnostic (config feature disabled)");
+        (Diagnostic::builder().build(), None)
     };
 
     let mut config_builder = ServerConfig::builder_with_vendor_type::<OpenSovdInfo>()
         .vendor_info(vendor_info)
         .diagnostic(Arc::new(diagnostic))
         .uri_path(urls.first().map(|u| u.path()).unwrap_or("/opensovd"));
+
+    if let Some(ref jwt_key_path) = args.auth_jwt.or(config_auth) {
+        let public_key_pem = std::fs::read(jwt_key_path)
+            .map_err(|e| format!("Failed to read JWT public key from {}: {}", jwt_key_path, e))?;
+        config_builder = config_builder.auth(AuthInfo { public_key_pem });
+        tracing::info!(target: TARGET, jwt_key_path = %jwt_key_path, "JWT authentication enabled");
+    }
 
     // Configure listeners for each URL
     for url in &urls {
@@ -106,13 +121,6 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             #[cfg(unix)]
-            "unix" => {
-                let socket_path = url.path();
-                let listener = UnixListener::bind(socket_path)?;
-                config_builder = config_builder.listen_uds(listener);
-            }
-
-            #[cfg(unix)]
             "http+unix" => {
                 // For Docker-style URLs like http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json
                 // the socket path is URL-encoded in the host part
@@ -133,8 +141,8 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = config_builder.build()?;
     let server = Server::<OpenSovdInfo>::new(config);
-    tracing::info!(version = cli::VERSION, features = ?ENABLED_FEATURES, "Starting OpenSOVD server");
-    tracing::info!(urls = ?urls_str, "Serving requests on URLs");
+    tracing::info!(target: TARGET, version = cli::VERSION, features = ?ENABLED_FEATURES, "Starting OpenSOVD server");
+    tracing::info!(target: TARGET, urls = ?urls_str, "Serving requests on URLs");
 
     server.start().await?;
     Ok(())
@@ -143,7 +151,6 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "openssl")]
 fn ssl_builder(ssl_args: &libosovd::SslArgs) -> std::result::Result<SslAcceptorBuilder, Box<dyn std::error::Error>> {
     let mut builder = SslAcceptor::mozilla_modern_v5(SslMethod::tls_server())?;
-
     let key_path = ssl_args.key.as_ref().ok_or("Private key file is required for HTTPS")?;
     let cert_path = ssl_args.cert.as_ref().ok_or("Certificate file is required for HTTPS")?;
 
@@ -153,7 +160,6 @@ fn ssl_builder(ssl_args: &libosovd::SslArgs) -> std::result::Result<SslAcceptorB
     if let Some(ca) = &ssl_args.cacert {
         builder.set_ca_file(ca)?;
     }
-
     let mut mode = SslVerifyMode::NONE;
     if !ssl_args.insecure {
         mode |= SslVerifyMode::PEER;
@@ -167,11 +173,12 @@ fn ssl_builder(ssl_args: &libosovd::SslArgs) -> std::result::Result<SslAcceptorB
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
+    use tracing_subscriber::fmt;
+
+    fmt().with_span_events(fmt::format::FmtSpan::CLOSE).compact().init();
     let tracer = tracing_log::LogTracer::new();
     log::set_boxed_logger(Box::new(tracer))?;
     log::set_max_level(log::LevelFilter::Debug);
-
     let runtime = Builder::new_current_thread().enable_all().build()?;
     runtime.block_on(serve())
 }

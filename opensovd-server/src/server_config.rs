@@ -24,6 +24,13 @@ use opensovd_models::version::VendorInfo;
 #[cfg(feature = "openssl")]
 use openssl::ssl::SslAcceptorBuilder;
 
+/// Authentication configuration for the server
+#[derive(Debug, Clone)]
+pub struct AuthInfo {
+    /// PEM-encoded public key for JWT validation
+    pub public_key_pem: Vec<u8>,
+}
+
 /// Server configuration containing binding and shutdown information.
 pub struct ServerConfig<T = VendorInfo> {
     /// The listener configurations for the server
@@ -36,6 +43,8 @@ pub struct ServerConfig<T = VendorInfo> {
     pub(crate) uri_path: String,
     /// Diagnostic instance for the server
     pub(crate) diagnostic: Arc<Diagnostic>,
+    /// Optional authentication configuration
+    pub(crate) auth: Option<AuthInfo>,
 }
 
 /// Error types for the ServerConfigBuilder.
@@ -159,6 +168,7 @@ pub struct ServerConfigBuilder<T = VendorInfo> {
     vendor_info: Option<T>,
     uri_path: Option<String>,
     diagnostic: Arc<Diagnostic>,
+    auth: Option<AuthInfo>,
 }
 
 impl<T> ServerConfigBuilder<T> {
@@ -170,6 +180,7 @@ impl<T> ServerConfigBuilder<T> {
             vendor_info: None,
             uri_path: None,
             diagnostic: Arc::new(Diagnostic::new()),
+            auth: None,
         }
     }
 
@@ -223,6 +234,12 @@ impl<T> ServerConfigBuilder<T> {
         self
     }
 
+    /// Set the authentication configuration for the server.
+    pub fn auth(mut self, auth: AuthInfo) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
     /// Builds the ServerConfig.
     ///
     /// # Errors
@@ -243,6 +260,7 @@ impl<T> ServerConfigBuilder<T> {
             vendor_info: self.vendor_info,
             uri_path: self.uri_path.unwrap_or_else(|| "/".to_string()),
             diagnostic: self.diagnostic,
+            auth: self.auth,
         })
     }
 }
@@ -258,6 +276,7 @@ impl Default for ServerConfigBuilder<VendorInfo> {
             }),
             uri_path: Some("/".to_string()),
             diagnostic: Arc::new(Diagnostic::new()),
+            auth: None,
         }
     }
 }

@@ -17,6 +17,7 @@
 //
 
 use std::sync::Arc;
+
 use tokio::sync::RwLock;
 
 use crate::resources::data::DataResource;
@@ -32,7 +33,7 @@ impl<T> Lockable<T> {
     pub fn new(value: T) -> Self {
         Self::new_with_type(value, "unknown")
     }
-    
+
     pub fn new_with_type(value: T, #[allow(unused_variables)] resource_type: &'static str) -> Self {
         Self {
             inner: Arc::new(RwLock::new(value)),
@@ -40,22 +41,22 @@ impl<T> Lockable<T> {
             resource_type,
         }
     }
-    
+
     pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, T> {
         #[cfg(feature = "metrics")]
         {
             let _timer = crate::metrics::record_lock_acquisition(self.resource_type, "read");
         }
-        
+
         self.inner.read().await
     }
-    
+
     pub async fn write(&self) -> tokio::sync::RwLockWriteGuard<'_, T> {
         #[cfg(feature = "metrics")]
         {
             let _timer = crate::metrics::record_lock_acquisition(self.resource_type, "write");
         }
-        
+
         self.inner.write().await
     }
 }
@@ -70,12 +71,7 @@ impl<T> Clone for Lockable<T> {
     }
 }
 
-/// Resource container for diagnostic resources
-///
-/// This container holds diagnostic resources as defined by ISO 17978-3,
-/// including data resources, fault resources, operations, etc.
 pub struct Resource {
-    /// ISO-compliant data resource with fine-grained locking
     pub data: Option<Lockable<Box<dyn DataResource>>>,
 }
 
@@ -93,34 +89,6 @@ impl Resource {
         Self { data: None }
     }
 
-    /// Creates a new Resource container with the given ISO-compliant data resource
-    ///
-    /// # Arguments
-    ///
-    /// * `data_resource` - A DataResource implementation to be stored
-    ///
-    /// # Returns
-    ///
-    /// A new Resource instance with the specified data resource
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use opensovd_diagnostic::resources::Resource;
-    /// # use opensovd_diagnostic::resources::data::{DataResource, DataItem, DataError};
-    /// # struct DummyDataResource;
-    /// # impl DataResource for DummyDataResource {
-    /// #     fn list_data_items(&self, _: &[String], _: &[String]) -> Vec<DataItem> { vec![] }
-    /// #     fn read_data(&self, _: &str) -> Result<serde_json::Value, DataError> { todo!() }
-    /// #     fn write_data(&mut self, _: &str, _: serde_json::Value) -> Result<(), DataError> { todo!() }
-    /// #     fn has_data_item(&self, _: &str) -> bool { false }
-    /// #     fn get_data_item(&self, _: &str) -> Option<DataItem> { None }
-    /// # }
-    /// let data_resource = DummyDataResource;
-    /// let resource = Resource::with_data_resource(data_resource);
-    ///
-    /// assert!(resource.has_data_resource());
-    /// ```
     pub fn with_data_resource(data_resource: Box<dyn DataResource>) -> Self {
         Self {
             data: Some(Lockable::new_with_type(data_resource, "data")),
@@ -145,5 +113,3 @@ impl Default for Resource {
 }
 
 pub mod data;
-
-pub use data::{DataError, DataItem};

@@ -38,10 +38,7 @@ certificate configuration.")]
 
   # HTTPS with insecure mode (no client cert required)
   osovd-gateway --url https://127.0.0.1:8443/opensovd \\
-    --cert server.pem --key server.key --insecure --no-peer-cert
-
-  # HTTP and Unix socket listeners
-  osovd-gateway --url http://127.0.0.1:8080/opensovd --url unix:///tmp/opensovd.sock")]
+    --cert server.pem --key server.key --insecure --no-peer-cert")]
 pub struct Args {
     /// Base URL for OpenSOVD server. Specify multiple times for multiple listeners.
     ///
@@ -51,8 +48,13 @@ pub struct Args {
 
     /// Path to configuration file.
     #[cfg(feature = "config")]
-    #[arg(short = 'c', long = "config", default_value = "config.toml")]
-    pub config: std::path::PathBuf,
+    #[arg(short = 'c', long = "config")]
+    pub config: Option<std::path::PathBuf>,
+
+    /// Path to RSA public key file (PEM format) for JWT authentication.
+    /// Can also be set via OSOVD_AUTH_JWT environment variable.
+    #[arg(long = "auth-jwt", env = "OSOVD_AUTH_JWT", help_heading = "Authentication")]
+    pub auth_jwt: Option<String>,
 
     #[cfg(feature = "openssl")]
     #[command(flatten)]
