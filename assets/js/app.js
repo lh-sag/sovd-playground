@@ -1,5 +1,79 @@
 /* OpenSOVD Web Interface - Application JavaScript */
 
+// Authentication Service
+const AuthService = {
+    TOKEN_KEY: 'sovd_auth_token',
+    TOKEN_EXPIRY_WARNING: 5 * 60 * 1000, // 5 minutes in milliseconds
+    TOKEN_CHECK_INTERVAL: 5 * 60 * 1000, // Check every 5 minutes
+    
+    // Parse JWT without verification (for client-side display only)
+    parseJWT(token) {
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Invalid JWT format');
+            }
+            const payload = parts[1];
+            const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+            return JSON.parse(decoded);
+        } catch (e) {
+            console.error('Failed to parse JWT:', e);
+            return null;
+        }
+    },
+    
+    // Save token to storage
+    saveToken(token, persist = false) {
+        const storage = persist ? localStorage : sessionStorage;
+        storage.setItem(this.TOKEN_KEY, token);
+        if (persist) {
+            localStorage.setItem(this.TOKEN_KEY + '_persist', 'true');
+        } else {
+            localStorage.removeItem(this.TOKEN_KEY + '_persist');
+        }
+    },
+    
+    // Load token from storage
+    loadToken() {
+        // Check if we should use persistent storage
+        const usePersistent = localStorage.getItem(this.TOKEN_KEY + '_persist') === 'true';
+        const storage = usePersistent ? localStorage : sessionStorage;
+        return storage.getItem(this.TOKEN_KEY);
+    },
+    
+    // Clear token from storage
+    clearToken() {
+        sessionStorage.removeItem(this.TOKEN_KEY);
+        localStorage.removeItem(this.TOKEN_KEY);
+        localStorage.removeItem(this.TOKEN_KEY + '_persist');
+    },
+    
+    // Check if token is expired
+    isTokenExpired(claims) {
+        if (!claims || !claims.exp) {
+            return false; // Can't determine, assume valid
+        }
+        const now = Math.floor(Date.now() / 1000);
+        return now >= claims.exp;
+    },
+    
+    // Check if token expires soon
+    isTokenExpiringSoon(claims) {
+        if (!claims || !claims.exp) {
+            return false;
+        }
+        const now = Math.floor(Date.now() / 1000);
+        const expiryTime = claims.exp * 1000; // Convert to milliseconds
+        const timeUntilExpiry = expiryTime - Date.now();
+        return timeUntilExpiry > 0 && timeUntilExpiry <= this.TOKEN_EXPIRY_WARNING;
+    },
+    
+    // Get authorization header
+    getAuthHeader(token) {
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+};
+
 // Telemetry Service
 const TelemetryService = {
     metrics: {
@@ -40,8 +114,8 @@ const TelemetryService = {
         console.log("[Telemetry] Service initialized");
     },
 
-    // Log API call metrics
-    async trackApiCall(url, method = "GET", fetchPromise) {
+    // Log API call metrics (modified to support auth)
+    async trackApiCall(url, method = "GET", fetchPromise, authToken = null) {
         const startTime = performance.now();
         const metric = {
             url,
@@ -50,6 +124,7 @@ const TelemetryService = {
             duration: null,
             status: null,
             error: null,
+            authenticated: !!authToken,
         };
 
         try {
@@ -65,6 +140,19 @@ const TelemetryService = {
                     `${method} ${url} took ${metric.duration.toFixed(0)}ms`,
                     this.levels.WARNING,
                 );
+            }
+
+            // Handle 401 Unauthorized responses
+            if (response.status === 401) {
+                this.log(
+                    "Authentication Required",
+                    `${method} ${url} requires authentication`,
+                    this.levels.WARNING,
+                );
+                // Trigger re-authentication in Vue app
+                if (window.vueApp) {
+                    window.vueApp.handleAuthenticationRequired();
+                }
             }
 
             return response;
@@ -242,6 +330,15 @@ const appConfig = {
             focusedResourceIndex: -1,
             showKeyboardHelp: false,
             keyboardMode: false, // Track if user is using keyboard navigation
+            // Authentication state
+            authToken: null,
+            authTokenClaims: null,
+            authTokenExpiry: null,
+            authTokenInput: "",
+            persistToken: false,
+            showAuthModal: false,
+            tokenExpiryWarning: false,
+            tokenExpiryCheckInterval: null,
         };
     },
     computed: {
@@ -290,18 +387,29 @@ const appConfig = {
             const fetchPromise = fetch("/opensovd/version-info", {
                 headers: {
                     "Content-Type": "application/json",
+                    ...AuthService.getAuthHeader(this.authToken),
                 },
             });
 
             await this.telemetry
-                .trackApiCall("/opensovd/version-info", "GET", fetchPromise)
+                .trackApiCall("/opensovd/version-info", "GET", fetchPromise, this.authToken)
                 .then((response) => {
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error(
-                        `HTTP ${response.status}: ${response.statusText}`,
-                    );
+                    // Handle 401 specially - trigger auth modal
+                    if (response.status === 401) {
+                        this.handleAuthenticationRequired();
+                        return null;
+                    }
+                    // Log other errors but don't throw
+                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    this.telemetry.logError("API Error", {
+                        url: "/opensovd/version-info",
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                    return null;
                 })
                 .then((data) => {
                     if (data && data.sovd_info && data.sovd_info.length > 0) {
@@ -317,15 +425,12 @@ const appConfig = {
                     }
                 })
                 .catch((error) => {
+                    // Network errors (not HTTP errors) still handled here
                     this.telemetry.logError(
                         "Failed to fetch version info",
                         error,
                     );
-                    this.telemetry.showToast(
-                        "Connection Error",
-                        "Failed to load version information",
-                        this.telemetry.levels.ERROR,
-                    );
+                    console.error("Network error fetching version info:", error);
                 });
         },
 
@@ -334,6 +439,7 @@ const appConfig = {
             const fetchPromise = fetch(`${this.apiBaseUrl}/components`, {
                 headers: {
                     "Content-Type": "application/json",
+                    ...AuthService.getAuthHeader(this.authToken),
                 },
             });
 
@@ -342,14 +448,25 @@ const appConfig = {
                     `${this.apiBaseUrl}/components`,
                     "GET",
                     fetchPromise,
+                    this.authToken
                 )
                 .then((response) => {
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error(
-                        `HTTP ${response.status}: ${response.statusText}`,
-                    );
+                    // Handle 401 specially - trigger auth modal
+                    if (response.status === 401) {
+                        this.handleAuthenticationRequired();
+                        return null;
+                    }
+                    // Log other errors but don't throw
+                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    this.telemetry.logError("API Error", {
+                        url: `${this.apiBaseUrl}/components`,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                    return null;
                 })
                 .then(async (data) => {
                     if (data) {
@@ -361,19 +478,18 @@ const appConfig = {
                         );
                     } else {
                         this.components = [];
+                        this.componentsWithResources = [];
                     }
                 })
                 .catch((error) => {
+                    // Network errors (not HTTP errors) still handled here
                     this.telemetry.logError(
                         "Failed to fetch components",
                         error,
                     );
                     this.components = [];
-                    this.telemetry.showToast(
-                        "Load Error",
-                        "Failed to load components",
-                        this.telemetry.levels.ERROR,
-                    );
+                    this.componentsWithResources = [];
+                    console.error("Network error fetching components:", error);
                 })
                 .finally(() => {
                     this.loadingComponents = false;
@@ -388,6 +504,7 @@ const appConfig = {
                     {
                         headers: {
                             "Content-Type": "application/json",
+                            ...AuthService.getAuthHeader(this.authToken),
                         },
                     },
                 );
@@ -397,11 +514,18 @@ const appConfig = {
                         `${this.apiBaseUrl}/components/${component.id}`,
                         "GET",
                         fetchPromise,
+                        this.authToken
                     )
                     .then((response) => {
                         if (response.ok) {
                             return response.json();
                         }
+                        // Handle 401 specially - but don't show modal for each component
+                        if (response.status === 401) {
+                            // Auth will be handled by main fetchComponents
+                            return null;
+                        }
+                        // Silently handle other errors for individual components
                         return null;
                     })
                     .then((capabilities) => {
@@ -417,10 +541,8 @@ const appConfig = {
                         }
                     })
                     .catch((error) => {
-                        this.telemetry.logError(
-                            `Failed to fetch resources for ${component.id}`,
-                            error,
-                        );
+                        // Network errors - return component without resources
+                        console.error(`Failed to fetch resources for ${component.id}:`, error);
                         return component;
                     });
             });
@@ -491,6 +613,7 @@ const appConfig = {
                 {
                     headers: {
                         "Content-Type": "application/json",
+                        ...AuthService.getAuthHeader(this.authToken),
                     },
                 },
             );
@@ -500,29 +623,46 @@ const appConfig = {
                     `${this.apiBaseUrl}/components/${component.id}`,
                     "GET",
                     fetchPromise,
+                    this.authToken
                 )
                 .then((response) => {
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error(
-                        `HTTP ${response.status}: ${response.statusText}`,
+                    // Handle 401 specially - trigger auth modal
+                    if (response.status === 401) {
+                        this.handleAuthenticationRequired();
+                        return null;
+                    }
+                    // Log other errors but don't throw
+                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    this.telemetry.logError("API Error", {
+                        url: `${this.apiBaseUrl}/components/${component.id}`,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                    this.telemetry.showToast(
+                        "Load Error",
+                        `Failed to load component details (${response.status})`,
+                        this.telemetry.levels.ERROR
                     );
+                    return null;
                 })
                 .then((data) => {
-                    this.componentDetails = data;
+                    if (data) {
+                        this.componentDetails = data;
+                    } else {
+                        this.componentDetails = null;
+                    }
                 })
                 .catch((error) => {
+                    // Network errors
                     this.telemetry.logError(
                         "Failed to fetch component details",
                         error,
                     );
                     this.componentDetails = null;
-                    this.telemetry.showToast(
-                        "Load Error",
-                        "Failed to load component details",
-                        this.telemetry.levels.ERROR,
-                    );
+                    console.error("Network error fetching component details:", error);
                 })
                 .finally(() => {
                     this.loadingDetails = false;
@@ -550,33 +690,50 @@ const appConfig = {
             const fetchPromise = fetch(resource.value, {
                 headers: {
                     "Content-Type": "application/json",
+                    ...AuthService.getAuthHeader(this.authToken),
                 },
             });
 
             await this.telemetry
-                .trackApiCall(resource.value, "GET", fetchPromise)
+                .trackApiCall(resource.value, "GET", fetchPromise, this.authToken)
                 .then((response) => {
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error(
-                        `HTTP ${response.status}: ${response.statusText}`,
+                    // Handle 401 specially - trigger auth modal
+                    if (response.status === 401) {
+                        this.handleAuthenticationRequired();
+                        return null;
+                    }
+                    // Log other errors but don't throw
+                    console.error(`API Error: ${response.status} ${response.statusText}`);
+                    this.telemetry.logError("API Error", {
+                        url: resource.value,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                    this.telemetry.showToast(
+                        "Load Error",
+                        `Failed to load resource data (${response.status})`,
+                        this.telemetry.levels.ERROR
                     );
+                    return null;
                 })
                 .then((data) => {
-                    this.resourceData = data;
+                    if (data) {
+                        this.resourceData = data;
+                    } else {
+                        this.resourceData = null;
+                    }
                 })
                 .catch((error) => {
+                    // Network errors
                     this.telemetry.logError(
                         "Failed to fetch resource data",
                         error,
                     );
                     this.resourceData = null;
-                    this.telemetry.showToast(
-                        "Load Error",
-                        "Failed to load resource data",
-                        this.telemetry.levels.ERROR,
-                    );
+                    console.error("Network error fetching resource data:", error);
                 })
                 .finally(() => {
                     this.loadingDetails = false;
@@ -755,6 +912,7 @@ const appConfig = {
                         {
                             headers: {
                                 "Content-Type": "application/json",
+                                ...AuthService.getAuthHeader(this.authToken),
                             },
                         },
                     );
@@ -764,24 +922,41 @@ const appConfig = {
                             `${this.apiBaseUrl}/components/${componentId}`,
                             "GET",
                             fetchPromise,
+                            this.authToken
                         )
                         .then((response) => {
                             if (response.ok) {
                                 return response.json();
                             }
-                            throw new Error(
-                                `HTTP ${response.status}: ${response.statusText}`,
-                            );
+                            // Handle 401 specially - trigger auth modal
+                            if (response.status === 401) {
+                                this.handleAuthenticationRequired();
+                                return null;
+                            }
+                            // Log other errors but don't throw
+                            console.error(`API Error: ${response.status} ${response.statusText}`);
+                            this.telemetry.logError("API Error", {
+                                url: `${this.apiBaseUrl}/components/${componentId}`,
+                                status: response.status,
+                                statusText: response.statusText
+                            });
+                            return null;
                         })
                         .then((data) => {
-                            this.componentDetails = data;
+                            if (data) {
+                                this.componentDetails = data;
+                            } else {
+                                this.componentDetails = null;
+                            }
                         })
                         .catch((error) => {
+                            // Network errors
                             this.telemetry.logError(
                                 "Failed to fetch component details",
                                 error,
                             );
                             this.componentDetails = null;
+                            console.error("Network error fetching component details:", error);
                         })
                         .finally(() => {
                             this.loadingDetails = false;
@@ -1018,6 +1193,155 @@ const appConfig = {
                    this.focusedIndex === componentIndex &&
                    this.focusedResourceIndex === resourceIndex;
         },
+
+        // Authentication methods
+        submitAuthToken() {
+            const token = this.authTokenInput.trim();
+            if (!token) return;
+            
+            const claims = AuthService.parseJWT(token);
+            if (!claims) {
+                this.telemetry.showToast(
+                    "Invalid Token",
+                    "The provided token is not a valid JWT",
+                    this.telemetry.levels.ERROR
+                );
+                return;
+            }
+            
+            // Check if token is expired
+            if (AuthService.isTokenExpired(claims)) {
+                this.telemetry.showToast(
+                    "Token Expired",
+                    "The provided token has already expired",
+                    this.telemetry.levels.ERROR
+                );
+                return;
+            }
+            
+            // Save token
+            AuthService.saveToken(token, this.persistToken);
+            
+            // Update state
+            this.authToken = token;
+            this.authTokenClaims = claims;
+            this.authTokenExpiry = claims.exp;
+            this.authTokenInput = ""; // Clear input
+            
+            // Start expiry check
+            this.startTokenExpiryCheck();
+            
+            this.telemetry.log(
+                "Authentication Success",
+                `Authenticated as ${claims.sub || 'User'}`
+            );
+            
+            // Refresh data with authenticated requests
+            this.fetchComponents();
+        },
+        
+        logout() {
+            AuthService.clearToken();
+            this.authToken = null;
+            this.authTokenClaims = null;
+            this.authTokenExpiry = null;
+            this.authTokenInput = "";
+            this.persistToken = false;
+            this.tokenExpiryWarning = false;
+            
+            // Stop expiry check
+            if (this.tokenExpiryCheckInterval) {
+                clearInterval(this.tokenExpiryCheckInterval);
+                this.tokenExpiryCheckInterval = null;
+            }
+            
+            this.telemetry.log("Logout", "User logged out");
+            
+            // Refresh data (will make unauthenticated requests)
+            this.fetchComponents();
+        },
+        
+        handleAuthenticationRequired() {
+            // Called when a 401 response is received
+            this.showAuthModal = true;
+            if (this.authToken) {
+                this.telemetry.showToast(
+                    "Authentication Failed",
+                    "Your token may have expired. Please re-authenticate.",
+                    this.telemetry.levels.WARNING
+                );
+            }
+        },
+        
+        startTokenExpiryCheck() {
+            // Clear existing interval
+            if (this.tokenExpiryCheckInterval) {
+                clearInterval(this.tokenExpiryCheckInterval);
+            }
+            
+            // Check token expiry periodically
+            this.tokenExpiryCheckInterval = setInterval(() => {
+                if (this.authTokenClaims) {
+                    if (AuthService.isTokenExpired(this.authTokenClaims)) {
+                        this.telemetry.showToast(
+                            "Token Expired",
+                            "Your authentication token has expired. Please sign in again.",
+                            this.telemetry.levels.WARNING
+                        );
+                        this.logout();
+                    } else if (AuthService.isTokenExpiringSoon(this.authTokenClaims)) {
+                        this.tokenExpiryWarning = true;
+                        if (!this.showAuthModal) {
+                            this.telemetry.showToast(
+                                "Token Expiring Soon",
+                                "Your token will expire in less than 5 minutes",
+                                this.telemetry.levels.WARNING
+                            );
+                        }
+                    } else {
+                        this.tokenExpiryWarning = false;
+                    }
+                }
+            }, AuthService.TOKEN_CHECK_INTERVAL);
+        },
+        
+        formatTokenExpiry() {
+            if (!this.authTokenExpiry) return 'Unknown';
+            
+            const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+            const now = Math.floor(Date.now() / 1000);
+            const diff = this.authTokenExpiry - now;
+            
+            if (diff < 0) {
+                return 'Expired';
+            } else if (diff < 60) {
+                return rtf.format(diff, 'second');
+            } else if (diff < 3600) {
+                return rtf.format(Math.floor(diff / 60), 'minute');
+            } else if (diff < 86400) {
+                return rtf.format(Math.floor(diff / 3600), 'hour');
+            } else {
+                return rtf.format(Math.floor(diff / 86400), 'day');
+            }
+        },
+        
+        loadAuthToken() {
+            // Load token from storage on mount
+            const token = AuthService.loadToken();
+            if (token) {
+                const claims = AuthService.parseJWT(token);
+                if (claims && !AuthService.isTokenExpired(claims)) {
+                    this.authToken = token;
+                    this.authTokenClaims = claims;
+                    this.authTokenExpiry = claims.exp;
+                    this.persistToken = localStorage.getItem(AuthService.TOKEN_KEY + '_persist') === 'true';
+                    this.startTokenExpiryCheck();
+                } else {
+                    // Clear expired token
+                    AuthService.clearToken();
+                }
+            }
+        },
     },
     mounted() {
         // Initialize telemetry
@@ -1029,9 +1353,15 @@ const appConfig = {
             referrer: document.referrer,
         });
 
+        // Load authentication token if available
+        this.loadAuthToken();
+
         // Fetch initial data
         this.fetchVersionInfo();
         this.fetchComponents();
+        
+        // Expose app instance for auth handling
+        window.vueApp = this;
 
         // Setup keyboard event listeners
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
