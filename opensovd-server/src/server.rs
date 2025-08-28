@@ -16,7 +16,7 @@ use opensovd_models::version::VendorInfo;
 use tracing::info;
 
 use crate::error::{Error, Result};
-use crate::middleware::TraceLayer;
+use crate::middleware::Tracing;
 use crate::routes;
 use crate::server_config::{Listener, ServerConfig};
 
@@ -76,7 +76,7 @@ where
         let server_builder = HttpServer::new(move || {
             let app = App::new();
             
-            let app = app.wrap(TraceLayer::http())
+            let app = app.wrap(Tracing::new())
                 .app_data(web::Data::new(routes::BaseUri(base_uri.clone())))
                 .app_data(web::Data::new(vendor_info.clone()))
                 .app_data(web::Data::from(diagnostic.clone()));
