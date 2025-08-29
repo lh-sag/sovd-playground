@@ -15,5 +15,6 @@ serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }
 derive_more = { workspace = true, features = ["display", "error"] }
 tokio = { workspace = true, features = ["sync"] }
+async-trait = { workspace = true }
 once_cell = { workspace = true, optional = true }
 prometheus = { workspace = true, optional = true }

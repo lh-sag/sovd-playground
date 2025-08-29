@@ -17,9 +17,8 @@
 //
 
 use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
 
+use async_trait::async_trait;
 use opensovd_diagnostic::resources::data::{DataError, DataItem, DataResource};
 
 /// Structure to hold data values with their metadata
@@ -58,81 +57,62 @@ impl HashMapDataResource {
     }
 }
 
+#[async_trait]
 impl DataResource for HashMapDataResource {
-    fn list_data_items<'a>(&'a self, categories: &'a [String], groups: &'a [String]) 
-        -> Pin<Box<dyn Future<Output = Vec<DataItem>> + Send + 'a>> 
-    {
-        Box::pin(async move {
-            self.data
-                .values()
-                .filter(|dv| {
-                    // Filter by categories (if specified)
-                    let category_match = categories.is_empty() || categories.contains(&dv.metadata.category);
+    async fn list_data_items(&self, categories: &[String], groups: &[String]) -> Vec<DataItem> {
+        self.data
+            .values()
+            .filter(|dv| {
+                // Filter by categories (if specified)
+                let category_match = categories.is_empty() || categories.contains(&dv.metadata.category);
 
-                    // Filter by groups (if specified)
-                    let group_match = groups.is_empty() || dv.metadata.groups.iter().any(|g| groups.contains(g));
+                // Filter by groups (if specified)
+                let group_match = groups.is_empty() || dv.metadata.groups.iter().any(|g| groups.contains(g));
 
-                    category_match && group_match
-                })
-                .map(|dv| DataItem {
-                    id: dv.metadata.id.clone(),
-                    name: dv.metadata.name.clone(),
-                    category: dv.metadata.category.clone(),
-                    groups: dv.metadata.groups.clone(),
-                    tags: dv.metadata.tags.clone(),
-                })
-                .collect()
-        })
-    }
-
-    fn read_data<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = Result<serde_json::Value, DataError>> + Send + 'a>> 
-    {
-        Box::pin(async move {
-            self.data
-                .get(data_id)
-                .map(|dv| dv.value.clone())
-                .ok_or_else(|| DataError::DataNotFound(data_id.to_string()))
-        })
-    }
-
-    fn write_data<'a>(&'a mut self, data_id: &'a str, value: serde_json::Value) 
-        -> Pin<Box<dyn Future<Output = Result<(), DataError>> + Send + 'a>> 
-    {
-        Box::pin(async move {
-            match self.data.get_mut(data_id) {
-                Some(data_value) => {
-                    if data_value.read_only {
-                        Err(DataError::ReadOnly(data_id.to_string()))
-                    } else {
-                        data_value.value = value;
-                        Ok(())
-                    }
-                }
-                None => Err(DataError::DataNotFound(data_id.to_string())),
-            }
-        })
-    }
-
-    fn has_data_item<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> 
-    {
-        Box::pin(async move {
-            self.data.contains_key(data_id)
-        })
-    }
-
-    fn get_data_item<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = Option<DataItem>> + Send + 'a>> 
-    {
-        Box::pin(async move {
-            self.data.get(data_id).map(|dv| DataItem {
+                category_match && group_match
+            })
+            .map(|dv| DataItem {
                 id: dv.metadata.id.clone(),
                 name: dv.metadata.name.clone(),
                 category: dv.metadata.category.clone(),
                 groups: dv.metadata.groups.clone(),
                 tags: dv.metadata.tags.clone(),
             })
+            .collect()
+    }
+
+    async fn read_data(&self, data_id: &str) -> Result<serde_json::Value, DataError> {
+        self.data
+            .get(data_id)
+            .map(|dv| dv.value.clone())
+            .ok_or_else(|| DataError::DataNotFound(data_id.to_string()))
+    }
+
+    async fn write_data(&mut self, data_id: &str, value: serde_json::Value) -> Result<(), DataError> {
+        match self.data.get_mut(data_id) {
+            Some(data_value) => {
+                if data_value.read_only {
+                    Err(DataError::ReadOnly(data_id.to_string()))
+                } else {
+                    data_value.value = value;
+                    Ok(())
+                }
+            }
+            None => Err(DataError::DataNotFound(data_id.to_string())),
+        }
+    }
+
+    async fn has_data_item(&self, data_id: &str) -> bool {
+        self.data.contains_key(data_id)
+    }
+
+    async fn get_data_item(&self, data_id: &str) -> Option<DataItem> {
+        self.data.get(data_id).map(|dv| DataItem {
+            id: dv.metadata.id.clone(),
+            name: dv.metadata.name.clone(),
+            category: dv.metadata.category.clone(),
+            groups: dv.metadata.groups.clone(),
+            tags: dv.metadata.tags.clone(),
         })
     }
 }

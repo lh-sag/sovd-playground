@@ -16,8 +16,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::future::Future;
-use std::pin::Pin;
+use async_trait::async_trait;
 
 /// Simplified data error for diagnostic operations
 ///
@@ -65,6 +64,7 @@ pub struct DataItem {
 /// This trait provides access to data resources within diagnostic entities.
 /// Data resources contain key-value pairs where values are JSON and items
 /// are categorized according to the ISO standard.
+#[async_trait]
 pub trait DataResource: Send + Sync + 'static {
     /// List all data items with optional filtering (string-based categories)
     ///
@@ -74,8 +74,7 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// Vector of data item metadata matching the filters
-    fn list_data_items<'a>(&'a self, categories: &'a [String], groups: &'a [String]) 
-        -> Pin<Box<dyn Future<Output = Vec<DataItem>> + Send + 'a>>;
+    async fn list_data_items(&self, categories: &[String], groups: &[String]) -> Vec<DataItem>;
 
     /// Read a specific data value
     ///
@@ -84,8 +83,7 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// The data value as JSON, or a DataError if not found/accessible
-    fn read_data<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = Result<serde_json::Value, DataError>> + Send + 'a>>;
+    async fn read_data(&self, data_id: &str) -> Result<serde_json::Value, DataError>;
 
     /// Write a specific data value
     ///
@@ -95,8 +93,7 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// Success or DataError if write failed
-    fn write_data<'a>(&'a mut self, data_id: &'a str, value: serde_json::Value) 
-        -> Pin<Box<dyn Future<Output = Result<(), DataError>> + Send + 'a>>;
+    async fn write_data(&mut self, data_id: &str, value: serde_json::Value) -> Result<(), DataError>;
 
     /// Check if a data item exists
     ///
@@ -105,8 +102,7 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// True if the data item exists, false otherwise
-    fn has_data_item<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>;
+    async fn has_data_item(&self, data_id: &str) -> bool;
 
     /// Get metadata for a specific data item
     ///
@@ -115,6 +111,5 @@ pub trait DataResource: Send + Sync + 'static {
     ///
     /// # Returns
     /// Data item metadata if found, None otherwise
-    fn get_data_item<'a>(&'a self, data_id: &'a str) 
-        -> Pin<Box<dyn Future<Output = Option<DataItem>> + Send + 'a>>;
+    async fn get_data_item(&self, data_id: &str) -> Option<DataItem>;
 }

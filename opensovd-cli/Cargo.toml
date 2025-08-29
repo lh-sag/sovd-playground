@@ -59,6 +59,7 @@ opensovd-models = { workspace = true }
 tokio = { workspace = true, features = [
     "macros",
 ] }
+async-trait = { workspace = true }
 http = { workspace = true }
 openssl = { workspace = true, optional = true }
 serde_json = { workspace = true }

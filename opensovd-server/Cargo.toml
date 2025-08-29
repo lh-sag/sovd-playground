@@ -44,3 +44,4 @@ derive_more = { workspace = true, features = [
 http = { workspace = true }
 schemars = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true }
+awc = { workspace = true }

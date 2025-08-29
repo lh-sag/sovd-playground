@@ -25,6 +25,8 @@ opensovd-models = { version = "0.0.1", path = "opensovd-models" }
 opensovd-diagnostic = { version = "0.0.1", path = "opensovd-diagnostic" }
 opensovd-client = { version = "0.0.1", path = "opensovd-client" }
 opensovd-server = { version = "0.0.1", path = "opensovd-server" }
+async-trait = "0.1"
+awc = { version = "3.5", default-features = false }
 tracing-log = { version = "0.2.0", default-features = false, features = [
     "log-tracer",
 ] }

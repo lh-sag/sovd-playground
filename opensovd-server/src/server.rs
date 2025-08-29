@@ -93,7 +93,8 @@ where
             };
             #[cfg(feature = "ui")]
             let app = app.configure(routes::ui::configure);
-            let app = app.configure(routes::metrics::configure);
+            let app = app.configure(routes::metrics::configure)
+                .configure(routes::proxy::configure);
             app
         });
 
@@ -128,7 +129,6 @@ where
         web::scope(base_path)
             .guard(guard::Header("content-type", "application/json"))
             .configure(routes::version::configure::<T>)
-            .configure(routes::hello::configure)
             .service(
                 web::scope("v1")
                     .configure(routes::entity::configure)

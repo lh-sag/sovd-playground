@@ -14,6 +14,7 @@
 pub(crate) mod data;
 pub(crate) mod entity;
 pub(crate) mod metrics;
+pub(crate) mod proxy;
 #[cfg(feature = "ui")]
 pub(crate) mod ui;
 pub(crate) mod version;
