@@ -16,13 +16,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub mod diagnostic;
 pub mod entities;
+pub mod middleware;
+pub mod registry;
 pub mod resources;
 
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
-pub use diagnostic::{Diagnostic, DiagnosticBuilder, ComponentBuilder};
 pub use entities::Component;
-pub use resources::data::DataResource;
+pub use registry::{ComponentRegistry, ComponentResolver};
+pub use resources::{Resource, DataResource, DataError, HealthStatus, LocalResource, RemoteResource};

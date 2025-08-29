@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use derive_more::{Debug, Display};
 use futures_core::future::BoxFuture;
-use opensovd_diagnostic::Diagnostic;
+use opensovd_diagnostic::registry::ComponentRegistry;
 use opensovd_models::version::VendorInfo;
 #[cfg(feature = "openssl")]
 use openssl::ssl::SslAcceptorBuilder;
@@ -41,8 +41,8 @@ pub struct ServerConfig<T = VendorInfo> {
     pub(crate) vendor_info: Option<T>,
     /// URI path for the server
     pub(crate) uri_path: String,
-    /// Diagnostic instance for the server
-    pub(crate) diagnostic: Arc<Diagnostic>,
+    /// Component registry for the server
+    pub(crate) registry: Arc<ComponentRegistry>,
     /// Optional authentication configuration
     pub(crate) auth: Option<AuthInfo>,
 }
@@ -113,7 +113,7 @@ impl ServerConfig {
 /// use opensovd_server::ServerConfig;
 /// use opensovd_models::version::VendorInfo;
 /// # use std::sync::Arc;
-/// # use opensovd_diagnostic::Diagnostic;
+/// # use opensovd_diagnostic::registry::ComponentRegistry;
 ///
 /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let http_listener = TcpListener::bind("127.0.0.1:8080")?;
@@ -126,7 +126,7 @@ impl ServerConfig {
 ///     .listen(http_listener)
 ///     .vendor_info(vendor_info)
 ///     .uri_path("/api")
-///     .diagnostic(Arc::new(Diagnostic::new()))
+///     .registry(Arc::new(ComponentRegistry::new()))
 ///     .build()?;
 /// # Ok(())
 /// # }
@@ -167,7 +167,7 @@ pub struct ServerConfigBuilder<T = VendorInfo> {
     shutdown: Option<BoxFuture<'static, ()>>,
     vendor_info: Option<T>,
     uri_path: Option<String>,
-    diagnostic: Arc<Diagnostic>,
+    registry: Arc<ComponentRegistry>,
     auth: Option<AuthInfo>,
 }
 
@@ -179,7 +179,7 @@ impl<T> ServerConfigBuilder<T> {
             shutdown: None,
             vendor_info: None,
             uri_path: None,
-            diagnostic: Arc::new(Diagnostic::new()),
+            registry: Arc::new(ComponentRegistry::new()),
             auth: None,
         }
     }
@@ -228,9 +228,9 @@ impl<T> ServerConfigBuilder<T> {
         self
     }
 
-    /// Set the diagnostic instance for the server.
-    pub fn diagnostic(mut self, diagnostic: Arc<Diagnostic>) -> Self {
-        self.diagnostic = diagnostic;
+    /// Set the component registry for the server.
+    pub fn registry(mut self, registry: Arc<ComponentRegistry>) -> Self {
+        self.registry = registry;
         self
     }
 
@@ -259,7 +259,7 @@ impl<T> ServerConfigBuilder<T> {
             shutdown: self.shutdown,
             vendor_info: self.vendor_info,
             uri_path: self.uri_path.unwrap_or_else(|| "/".to_string()),
-            diagnostic: self.diagnostic,
+            registry: self.registry,
             auth: self.auth,
         })
     }
@@ -275,7 +275,7 @@ impl Default for ServerConfigBuilder<VendorInfo> {
                 name: "OpenSOVD".to_string(),
             }),
             uri_path: Some("/".to_string()),
-            diagnostic: Arc::new(Diagnostic::new()),
+            registry: Arc::new(ComponentRegistry::new()),
             auth: None,
         }
     }

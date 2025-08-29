@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 #[cfg(not(feature = "config"))]
-use opensovd_diagnostic::Diagnostic;
+use opensovd_diagnostic::registry::ComponentRegistry;
 use opensovd_server::{AuthInfo, Server, ServerConfig};
 #[cfg(feature = "openssl")]
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode};
@@ -58,7 +58,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     #[cfg(feature = "config")]
-    let (diagnostic, config_auth) = {
+    let (registry, config_auth) = {
         let cfg = match &args.config {
             Some(config_path) => {
                 tracing::info!(target: TARGET,"Loading configuration from {:?}", config_path);
@@ -78,18 +78,18 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|a| a.jwt.as_ref())
             .map(|jwt| jwt.public_key_path.clone());
 
-        (cfg.build_diagnostic()?, auth)
+        (cfg.build_registry()?, auth)
     };
 
     #[cfg(not(feature = "config"))]
-    let (diagnostic, config_auth) = {
-        tracing::info!(target: TARGET, "Using empty diagnostic (config feature disabled)");
-        (Diagnostic::builder().build(), None)
+    let (registry, config_auth) = {
+        tracing::info!(target: TARGET, "Using empty registry (config feature disabled)");
+        (ComponentRegistry::new(), None)
     };
 
     let mut config_builder = ServerConfig::builder_with_vendor_type::<OpenSovdInfo>()
         .vendor_info(vendor_info)
-        .diagnostic(Arc::new(diagnostic))
+        .registry(Arc::new(registry))
         .uri_path(urls.first().map(|u| u.path()).unwrap_or("/opensovd"));
 
     if let Some(ref jwt_key_path) = args.auth_jwt.or(config_auth) {

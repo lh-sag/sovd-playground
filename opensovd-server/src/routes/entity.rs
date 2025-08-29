@@ -15,7 +15,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 use actix_web::{HttpRequest, HttpResponse, web};
-use opensovd_diagnostic::Diagnostic;
+use opensovd_diagnostic::registry::ComponentRegistry;
 use opensovd_models::entity::{ComponentCapabilitiesResponse, EntityId, EntityReference, EntityResponse};
 
 use crate::response::create_api_response;
@@ -33,28 +33,29 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
 // GET /components
 async fn list_entities(
     base_uri: web::Data<super::BaseUri>,
-    diagnostic: web::Data<Diagnostic>,
+    registry: web::Data<ComponentRegistry>,
     req: HttpRequest,
 ) -> Result<HttpResponse, crate::response::ApiError> {
-    // Collect components from the diagnostic system
-    let items: Vec<EntityReference> = diagnostic
-        .components()
-        .map(|component| {
-            let id = component.id().clone();
+    // Collect components from the registry
+    let component_ids = registry.list_component_ids().await;
+    let mut items = Vec::new();
+    
+    for id in component_ids {
+        if let Some(component) = registry.get_component(&id).await {
             let name = component.name().to_string();
             let href = format!("{}/components/{}", base_uri.0, id);
 
-            EntityReference {
+            items.push(EntityReference {
                 entity: EntityId {
-                    id,
+                    id: id.clone(),
                     name,
                     ..Default::default()
                 },
                 href,
                 ..Default::default()
-            }
-        })
-        .collect();
+            });
+        }
+    }
 
     if items.is_empty() {
         return Err(crate::response::ApiError::not_found("No components found"));
@@ -66,25 +67,24 @@ async fn list_entities(
 async fn list_capabilities(
     _base_uri: web::Data<super::BaseUri>,
     component: web::Path<(String,)>,
-    diagnostic: web::Data<Diagnostic>,
+    registry: web::Data<ComponentRegistry>,
     req: HttpRequest,
 ) -> Result<HttpResponse, crate::response::ApiError> {
-    // Try to get the component from the diagnostic system
+    // Try to get the component from the registry
     let component_id = &component.0;
 
-    // Early return if component not found - using the ? operator pattern
-    let comp = diagnostic
+    // Early return if component not found
+    let comp = registry
         .get_component(component_id)
+        .await
         .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
 
     // Check what resources the component has
     let mut resources = opensovd_models::entity::Resources::default();
 
-    // Check if component has a data resource
-    if comp.resource().has_data_resource() {
-        resources.data = Some(format!("/opensovd/v1/components/{component_id}/data"));
-        resources.data_list = Some(format!("/opensovd/v1/components/{component_id}/data-lists"));
-    }
+    // All components with the new architecture have data resources
+    resources.data = Some(format!("/opensovd/v1/components/{component_id}/data"));
+    resources.data_list = Some(format!("/opensovd/v1/components/{component_id}/data-lists"));
 
     let response = ComponentCapabilitiesResponse {
         entity: EntityId {

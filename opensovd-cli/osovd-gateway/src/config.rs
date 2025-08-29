@@ -12,7 +12,12 @@
 //
 use std::path::Path;
 
-use opensovd_diagnostic::{Diagnostic, resources::data::DataItem};
+use opensovd_diagnostic::{
+    resources::data::DataItem,
+    registry::ComponentRegistry,
+    entities::Component,
+    resources::{LocalResource, RemoteResource},
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "config-entities")]
@@ -48,6 +53,21 @@ pub struct ComponentConfig {
     pub name: String,
     #[serde(default)]
     pub data: Vec<DataItemConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote: Option<RemoteConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RemoteConfig {
+    pub url: String,
+    #[serde(default)]
+    pub headers: std::collections::HashMap<String, String>,
+    #[serde(default = "default_timeout")]
+    pub timeout_ms: u64,
+}
+
+fn default_timeout() -> u64 {
+    5000
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -92,43 +112,54 @@ impl Config {
         Self::from_str(EMBEDDED_CONFIG).expect("Embedded config should be valid")
     }
 
-    pub fn build_diagnostic(self) -> Result<Diagnostic, Box<dyn std::error::Error>> {
-        let mut builder = Diagnostic::builder();
+    pub fn build_registry(self) -> Result<ComponentRegistry, Box<dyn std::error::Error>> {
+        let mut registry_builder = ComponentRegistry::builder();
 
         #[cfg(feature = "config-entities")]
         {
             for component_cfg in self.components {
-                let mut data_resource = HashMapDataResource::new();
+                // Determine the component ID
+                let component_id = component_cfg.id.clone()
+                    .unwrap_or_else(|| format!("component-{}", uuid::Uuid::new_v4()));
 
-                for data_cfg in component_cfg.data {
-                    let metadata = DataItem {
-                        id: data_cfg.id,
-                        name: data_cfg.name,
-                        category: data_cfg.category,
-                        groups: data_cfg.groups,
-                        tags: data_cfg.tags,
-                    };
-                    let data_value = DataValue {
-                        value: data_cfg.value,
-                        metadata,
-                        read_only: !data_cfg.writable,
-                    };
-                    data_resource.insert(data_value);
-                }
-
-                // Start building component with name
-                let component_builder = builder.component(component_cfg.name);
-                
-                // Only call .id() if explicitly provided in config
-                let component_builder = if let Some(id) = component_cfg.id {
-                    component_builder.id(id)
+                // Create component based on whether it's remote or local
+                let component = if let Some(remote_cfg) = component_cfg.remote {
+                    // Remote component
+                    let remote_resource = RemoteResource::new(remote_cfg.url)
+                        .with_headers(remote_cfg.headers)
+                        .with_timeout(remote_cfg.timeout_ms);
+                    
+                    Component::builder(component_id, component_cfg.name)
+                        .with_resource(Box::new(remote_resource))
+                        .build()
                 } else {
-                    component_builder  // Use auto-generated ID
+                    // Local component with data
+                    let mut data_resource = HashMapDataResource::new();
+
+                    for data_cfg in component_cfg.data {
+                        let metadata = DataItem {
+                            id: data_cfg.id,
+                            name: data_cfg.name,
+                            category: data_cfg.category,
+                            groups: data_cfg.groups,
+                            tags: data_cfg.tags,
+                        };
+                        let data_value = DataValue {
+                            value: data_cfg.value,
+                            metadata,
+                            read_only: !data_cfg.writable,
+                        };
+                        data_resource.insert(data_value);
+                    }
+
+                    let local_resource = LocalResource::new(Box::new(data_resource));
+                    
+                    Component::builder(component_id, component_cfg.name)
+                        .with_resource(Box::new(local_resource))
+                        .build()
                 };
-                
-                builder = component_builder
-                    .data_resource(data_resource)
-                    .add()?;
+
+                registry_builder = registry_builder.with_component(component);
             }
         }
 
@@ -142,6 +173,6 @@ impl Config {
             }
         }
 
-        Ok(builder.build())
+        Ok(registry_builder.build())
     }
 }

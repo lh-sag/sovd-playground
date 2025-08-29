@@ -56,7 +56,7 @@ where
         let uri_path = self.config.uri_path.trim_end_matches('/').to_string();
         let base_uri = self.config.uri_path.clone();
         let vendor_info = self.config.vendor_info.clone();
-        let diagnostic = self.config.diagnostic.clone();
+        let registry = self.config.registry.clone();
 
         // Setup authentication middleware if configured
         let auth_middleware = if let Some(auth_info) = self.config.auth {
@@ -72,7 +72,7 @@ where
                 .wrap(Tracing::new())
                 .app_data(web::Data::new(routes::BaseUri(base_uri.clone())))
                 .app_data(web::Data::new(vendor_info.clone()))
-                .app_data(web::Data::from(diagnostic.clone()));
+                .app_data(web::Data::from(registry.clone()));
 
             let base_scope = web::scope(&uri_path)
                 .guard(guard::Header("content-type", "application/json"))
@@ -93,8 +93,7 @@ where
             };
             #[cfg(feature = "ui")]
             let app = app.configure(routes::ui::configure);
-            let app = app.configure(routes::metrics::configure)
-                .configure(routes::proxy::configure);
+            let app = app.configure(routes::metrics::configure);
             app
         });
 

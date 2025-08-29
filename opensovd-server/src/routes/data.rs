@@ -16,7 +16,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use actix_web::{HttpRequest, HttpResponse, web};
-use opensovd_diagnostic::Diagnostic;
+use opensovd_diagnostic::registry::ComponentRegistry;
 use opensovd_models::entity::{DataResourceQuery, DataResourceResponse, DataValueResponse, DataWriteRequest};
 
 use crate::convert::{data_error_to_response, data_items_to_resource_items};
@@ -34,23 +34,20 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
 async fn list_data_resources(
     component_id: web::Path<String>,
     query: web::Query<DataResourceQuery>,
-    diagnostic: web::Data<Diagnostic>,
+    registry: web::Data<ComponentRegistry>,
     req: HttpRequest,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let component_id = component_id.as_str();
-    let component = diagnostic
+    let component = registry
         .get_component(component_id)
+        .await
         .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
 
-    let data_resource_lock = component.resource().get_data_resource().ok_or_else(|| {
-        crate::response::ApiError::not_found(format!("Component '{component_id}' has no data resources"))
-    })?;
-
     let query = query.into_inner();
-    let data_resource = data_resource_lock.read().await;
     let categories = query.categories.unwrap_or_default();
     let groups = query.groups.unwrap_or_default();
-    let data_items = data_resource.list_data_items(&categories, &groups).await;
+    let data_items = component.list_data_items(&categories, &groups).await
+        .map_err(|e| crate::response::ApiError::internal_error(format!("Failed to list data: {}", e)))?;
     let items = data_items_to_resource_items(data_items);
     let response = DataResourceResponse { items };
 
@@ -62,18 +59,16 @@ async fn list_data_resources(
 async fn get_data_value(
     path: web::Path<(String, String)>,
     _query: Option<web::Query<DataResourceQuery>>,
-    diagnostic: web::Data<Diagnostic>,
+    registry: web::Data<ComponentRegistry>,
     req: HttpRequest,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let (component_id, data_id) = path.into_inner();
-    let component = diagnostic
+    let component = registry
         .get_component(&component_id)
+        .await
         .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-    let data_resource_lock = component.resource().get_data_resource().ok_or_else(|| {
-        crate::response::ApiError::not_found(format!("Component '{component_id}' has no data resources"))
-    })?;
-    let data_resource = data_resource_lock.read().await;
-    let response = match data_resource.read_data(&data_id).await {
+    
+    let response = match component.read_data(&data_id).await {
         Ok(data) => DataValueResponse {
             id: data_id,
             data,
@@ -100,19 +95,17 @@ async fn get_data_value(
 async fn set_data_value(
     path: web::Path<(String, String)>,
     request: web::Json<DataWriteRequest>,
-    diagnostic: web::Data<Diagnostic>,
+    registry: web::Data<ComponentRegistry>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let (component_id, data_id) = path.into_inner();
     let write_request = request.into_inner();
-    let component = diagnostic
+    let component = registry
         .get_component(&component_id)
+        .await
         .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-    let data_resource_lock = component.resource().get_data_resource().ok_or_else(|| {
-        crate::response::ApiError::not_found(format!("Component '{component_id}' has no data resources"))
-    })?;
-    let mut data_resource = data_resource_lock.write().await;
-    match data_resource.write_data(&data_id, write_request.data).await {
+    
+    match component.write_data(&data_id, write_request.data).await {
         Ok(()) => {
             Ok(HttpResponse::NoContent().finish())
         }

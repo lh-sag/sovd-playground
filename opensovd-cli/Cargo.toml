@@ -76,3 +76,4 @@ derive_more = { workspace = true, features = [
 ] }
 tracing-log = { workspace = true }
 log = { workspace = true }
+uuid = { version = "1.0", features = ["v4"] }
