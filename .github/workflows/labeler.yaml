@@ -13,4 +13,4 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
       - name: Run labeler
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6
