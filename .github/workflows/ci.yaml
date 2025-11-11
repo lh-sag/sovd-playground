@@ -64,7 +64,7 @@ jobs:
           fi
         shell: bash
       - name: Upload osovd-gateway binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: osovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
           path: |
