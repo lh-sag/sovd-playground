@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <base href="/ui/" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval';"
+        />
+        <title>SOVD</title>
+        <link href="./css/bootstrap.min.css" rel="stylesheet" />
+        <link href="./css/bootstrap-icons.css" rel="stylesheet" />
+        <link href="./css/app.css" rel="stylesheet" />
+    </head>
+    <body>
+        <div id="app">
+            <nav class="topbar">
+                <div
+                    class="container-fluid d-flex justify-content-between align-items-center"
+                >
+                    <div>SOVD</div>
+                    <div class="auth-status">
+                        <button
+                            v-if="authToken"
+                            class="btn btn-sm btn-outline-light"
+                            @click="showAuthModal = true"
+                            :title="'Authenticated as ' + (authTokenClaims?.sub || 'User')"
+                        >
+                            <i class="bi bi-shield-check"></i>
+                            <span v-text="authTokenClaims?.sub || 'Authenticated'"></span>
+                        </button>
+                        <button
+                            v-else
+                            class="btn btn-sm btn-outline-light"
+                            @click="showAuthModal = true"
+                        >
+                            <i class="bi bi-shield-x"></i>
+                            Sign In
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content area -->
+            <div class="content">
+                <!-- Sidebar with component tree -->
+                <div class="sidebar">
+                    <!-- Server banner -->
+                    <div
+                        v-if="versionInfo && versionInfo.sovd_info"
+                        class="server-banner"
+                        @mouseenter="showVersionPaneOnHover"
+                        @mouseleave="hideVersionPaneOnLeave"
+                    >
+                        <div>
+                            <i class="bi bi-hdd-network"></i>
+                            <span
+                                v-text="serverUrl || window.location.host"
+                            ></span>
+                        </div>
+                        <div>
+                            <span
+                                v-if="currentVersion"
+                                v-text="'v' + currentVersion.version"
+                            ></span>
+                            <i
+                                class="bi bi-chevron-right ms-2"
+                            ></i>
+                        </div>
+                    </div>
+                    <h6 class="mb-2 sidebar-title">
+                        <i class="bi bi-diagram-3"></i> Components
+                    </h6>
+                    <div class="mb-2">
+                        <input
+                            type="text"
+                            v-model="filterText"
+                            @input="onFilterInput"
+                            class="form-control form-control-sm filter-input"
+                            placeholder="Filter components..."
+                            maxlength="100"
+                        />
+                    </div>
+
+                    <!-- Loading skeleton for components -->
+                    <div v-if="loadingComponents">
+                        <div
+                            v-for="i in 5"
+                            :key="'skeleton-' + i"
+                            class="skeleton skeleton-tree-item"
+                        >
+                            <div class="skeleton skeleton-tree-icon"></div>
+                            <div class="skeleton skeleton-tree-text"></div>
+                        </div>
+                    </div>
+
+                    <ul
+                        v-else-if="components.length > 0"
+                        class="component-tree"
+                    >
+                        <component-tree-item
+                            v-for="component in filteredComponents"
+                            :key="component.id"
+                            :component="component"
+                            :level="0"
+                            :selected-item="selectedItem"
+                            :expanded-components="expandedComponents"
+                            :get-resource-icon="getResourceIcon"
+                            :format-resource-name="formatResourceName"
+                            @select-component="selectComponent"
+                            @select-resource="selectResource"
+                            @toggle-expand="toggleExpand"
+                        ></component-tree-item>
+                    </ul>
+                    <div v-else class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        <p class="mt-2">No components available</p>
+                    </div>
+                </div>
+
+                <!-- Main panel -->
+                <div class="main-panel">
+                    <!-- Breadcrumb Navigation -->
+                    <nav
+                        v-if="selectedItem"
+                        aria-label="breadcrumb"
+                        class="mb-3 breadcrumb-wrapper"
+                    >
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a
+                                    href="#"
+                                    @click.prevent="clearSelection()"
+                                    class="breadcrumb-link"
+                                >
+                                    <i class="bi bi-diagram-3"></i>
+                                    Components
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a
+                                    href="#"
+                                    @click.prevent="selectComponentFromBreadcrumb()"
+                                    class="breadcrumb-link"
+                                >
+                                    <i class="bi bi-box"></i>
+                                    <span
+                                        v-text="selectedItem.name || selectedItem.componentName || selectedItem.id"
+                                    ></span>
+                                </a>
+                            </li>
+                            <li
+                                v-if="selectedItem.type === 'resource'"
+                                class="breadcrumb-item active"
+                                aria-current="page"
+                            >
+                                <i
+                                    :class="getResourceIcon(selectedItem.key)"
+                                ></i>
+                                <span
+                                    v-text="formatResourceName(selectedItem.key)"
+                                ></span>
+                            </li>
+                        </ol>
+                    </nav>
+
+                    <div v-if="!selectedItem" class="empty-state">
+                        <i class="bi bi-arrow-left-circle empty-state-icon"></i>
+                        <h5 class="mt-3">Select a component or resource</h5>
+                        <p>
+                            Choose a component from the left panel to view its
+                            details
+                        </p>
+                    </div>
+
+                    <!-- Loading skeleton for details -->
+                    <div v-else-if="loadingDetails">
+                        <div class="skeleton skeleton-card"></div>
+                        <div class="skeleton skeleton-card"></div>
+                    </div>
+
+                    <div
+                        v-else-if="selectedItem.type === 'component' && componentDetails"
+                    >
+                        <div class="info-card">
+                            <h6 class="mb-3">Component Information</h6>
+                            <div class="info-row">
+                                <span class="info-label">ID:</span>
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.id"
+                                ></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Name:</span>
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.name || 'N/A'"
+                                ></span>
+                            </div>
+                            <div
+                                v-if="componentDetails.translation_id"
+                                class="info-row"
+                            >
+                                <span class="info-label">Translation ID:</span>
+                                <span
+                                    class="info-value"
+                                    v-text="componentDetails.translation_id"
+                                ></span>
+                            </div>
+
+                            <!-- Display component extensions if present -->
+                            <div v-if="componentDetails.extensions">
+                                <hr class="my-2" />
+                                <div
+                                    v-for="(value, key) in componentDetails.extensions"
+                                    :key="key"
+                                    class="info-row"
+                                >
+                                    <span
+                                        class="info-label"
+                                        v-text="formatExtensionKey(key) + ':'"
+                                    ></span>
+                                    <span
+                                        class="info-value"
+                                        v-text="formatExtensionValue(value)"
+                                    ></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="componentDetails.resources && Object.keys(componentDetails.resources).length > 0"
+                            class="info-card"
+                        >
+                            <h6 class="mb-3">Available Resources</h6>
+                            <p class="text-muted">
+                                Expand the component in the tree view to access
+                                individual resources.
+                            </p>
+                            <ul class="list-unstyled mb-0">
+                                <li
+                                    v-for="(value, key) in componentDetails.resources"
+                                    :key="key"
+                                    v-if="key !== 'extensions'"
+                                >
+                                    <i
+                                        :class="getResourceIcon(key)"
+                                        class="me-2"
+                                    ></i>
+                                    <span
+                                        v-text="formatResourceName(key)"
+                                    ></span>
+                                </li>
+                            </ul>
+
+                            <!-- Display resource extensions if present -->
+                            <div
+                                v-if="componentDetails.resources && componentDetails.resources.extensions"
+                                class="mt-2"
+                            >
+                                <strong>Resource Extensions:</strong>
+                                <div
+                                    v-for="(value, key) in componentDetails.resources.extensions"
+                                    :key="key"
+                                    class="ms-3 resource-extensions"
+                                >
+                                    <span
+                                        v-text="formatExtensionKey(key) + ': ' + formatExtensionValue(value)"
+                                    ></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            No resources available for this component
+                        </div>
+                    </div>
+
+                    <div v-else-if="selectedItem.type === 'resource'">
+                        <!-- Resource Data Display -->
+                        <div v-if="resourceData" class="info-card">
+                            <h6 class="mb-3">Resource Data</h6>
+
+                            <!-- For data resources with items array -->
+                            <div
+                                v-if="resourceData.items && Array.isArray(resourceData.items)"
+                            >
+                                <div
+                                    v-if="resourceData.items.length === 0"
+                                    class="alert alert-info"
+                                >
+                                    <i class="bi bi-info-circle"></i>
+                                    No data items available in this resource.
+                                </div>
+                                <div v-else>
+                                    <div class="table-responsive">
+                                        <table
+                                            class="table table-sm data-table"
+                                        >
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Name</th>
+                                                    <th>Category</th>
+                                                    <th>Groups</th>
+                                                    <th>Tags</th>
+                                                    <th>Read Only</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <template v-for="item in resourceData.items" :key="item.id">
+                                                    <tr
+                                                        class="data-table-row"
+                                                        :class="{ 'expanded': expandedDataItem === item.id }"
+                                                        @click="toggleDataItem(item)"
+                                                        style="cursor: pointer;"
+                                                    >
+                                                        <td class="data-table-cell">
+                                                            <i class="bi bi-chevron-right expand-icon me-1"
+                                                               :class="{ 'rotated': expandedDataItem === item.id }"></i>
+                                                            <code
+                                                                class="code-inline"
+                                                                v-text="item.id"
+                                                            ></code>
+                                                        </td>
+                                                        <td
+                                                            class="data-table-cell"
+                                                            v-text="item.name || 'N/A'"
+                                                        ></td>
+                                                        <td class="data-table-cell">
+                                                            <span
+                                                                class="badge badge-category"
+                                                                v-text="item.category"
+                                                            ></span>
+                                                        </td>
+                                                        <td class="data-table-cell">
+                                                            <span
+                                                                v-for="group in (item.groups || [])"
+                                                                :key="group"
+                                                                class="badge badge-group me-1"
+                                                                v-text="group"
+                                                            ></span>
+                                                            <span
+                                                                v-if="!item.groups || item.groups.length === 0"
+                                                                class="text-none"
+                                                                >None</span
+                                                            >
+                                                        </td>
+                                                        <td class="data-table-cell">
+                                                            <span
+                                                                v-for="tag in (item.tags || [])"
+                                                                :key="tag"
+                                                                class="badge badge-tag me-1"
+                                                                v-text="tag"
+                                                            ></span>
+                                                            <span
+                                                                v-if="!item.tags || item.tags.length === 0"
+                                                                class="text-none"
+                                                                >None</span
+                                                            >
+                                                        </td>
+                                                        <td class="data-table-cell">
+                                                            <i
+                                                                class="icon-status"
+                                                                :class="item.read_only ? 'bi bi-lock locked' : 'bi bi-unlock unlocked'"
+                                                            ></i>
+                                                            <span
+                                                                v-text="item.read_only ? 'Yes' : 'No'"
+                                                            ></span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr v-if="expandedDataItem === item.id" class="data-value-row">
+                                                        <td colspan="6" class="data-value-cell">
+                                                            <div class="data-value-container">
+                                                                <div v-if="loadingDataValue" class="text-center py-3">
+                                                                    <div class="spinner-border spinner-border-sm" role="status">
+                                                                        <span class="visually-hidden">Loading...</span>
+                                                                    </div>
+                                                                    <span class="ms-2">Loading data value...</span>
+                                                                </div>
+                                                                <div v-else-if="dataValueError" class="alert alert-danger mb-0">
+                                                                    <i class="bi bi-exclamation-triangle"></i>
+                                                                    <span v-text="dataValueError"></span>
+                                                                </div>
+                                                                <div v-else-if="editingDataItem === item.id" class="data-edit-mode">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <label class="form-label text-muted small">Current Value:</label>
+                                                                            <pre class="code-display mb-2"><code v-text="formatJson(dataValues.get(item.id))"></code></pre>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <label class="form-label text-muted small">New Value:</label>
+                                                                            <textarea
+                                                                                v-model="editingDataValue"
+                                                                                class="form-control code-editor"
+                                                                                :class="{ 'is-invalid': dataValueValidationError }"
+                                                                                rows="8"
+                                                                                @input="validateDataValue"
+                                                                            ></textarea>
+                                                                            <div v-if="dataValueValidationError" class="invalid-feedback">
+                                                                                {{ dataValueValidationError }}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="mt-3 d-flex justify-content-end gap-2">
+                                                                        <button class="btn btn-sm btn-secondary" @click="cancelEdit(item)">
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            class="btn btn-sm btn-primary"
+                                                                            @click="saveDataValue(item)"
+                                                                            :disabled="!!dataValueValidationError || savingDataValue"
+                                                                        >
+                                                                            <span v-if="savingDataValue">
+                                                                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                                                                Saving...
+                                                                            </span>
+                                                                            <span v-else>Save Changes</span>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <div v-else class="data-view-mode">
+                                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                                        <label class="form-label text-muted small mb-0">Current Value:</label>
+                                                                        <div class="btn-group btn-group-sm">
+                                                                            <button class="btn btn-outline-secondary" @click="copyDataValue(item)" title="Copy to clipboard">
+                                                                                <i class="bi bi-clipboard"></i> Copy
+                                                                            </button>
+                                                                            <button
+                                                                                class="btn btn-outline-secondary"
+                                                                                @click="refreshDataValue(item)"
+                                                                                title="Refresh value"
+                                                                            >
+                                                                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                                                                            </button>
+                                                                            <button
+                                                                                v-if="!item.read_only"
+                                                                                class="btn btn-outline-primary"
+                                                                                @click="enterEditMode(item)"
+                                                                                title="Edit value"
+                                                                            >
+                                                                                <i class="bi bi-pencil"></i> Edit
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <pre class="code-display mb-0"><code v-text="formatJson(dataValues.get(item.id))"></code></pre>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- For other resource types, display as JSON -->
+                            <div v-else>
+                                <pre
+                                    class="code-display"
+                                ><code v-text="JSON.stringify(resourceData, null, 2)"></code></pre>
+                            </div>
+                        </div>
+
+                        <div
+                            v-else-if="!loadingDetails"
+                            class="alert alert-info"
+                        >
+                            <i class="bi bi-info-circle"></i>
+                            No data available for this resource.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Version Selection Pane -->
+                <div
+                    class="version-pane"
+                    :class="{ open: showVersionPane }"
+                    @mouseenter="keepVersionPaneOpen"
+                    @mouseleave="hidePaneOnLeave"
+                >
+                    <div class="version-pane-content">
+                        <div class="list-group list-group-flush">
+                            <div
+                                v-for="(version, index) in versionInfo?.sovd_info || []"
+                                :key="index"
+                                class="list-group-item list-group-item-action"
+                                :class="{ active: selectedVersion === version.base_uri }"
+                                @click="selectVersionFromPane(version)"
+                            >
+                                <div
+                                    class="version-title"
+                                    v-text="'API Version ' + version.version"
+                                ></div>
+                                <div
+                                    class="version-uri"
+                                    v-text="version.base_uri"
+                                ></div>
+                                <div
+                                    v-if="version.vendor_info"
+                                    class="vendor-info"
+                                >
+                                    <div
+                                        v-for="[key, value] in formatVendorInfo(version.vendor_info)"
+                                        :key="key"
+                                        class="vendor-info-item"
+                                    >
+                                        <span
+                                            class="vendor-key"
+                                            v-text="key + ':'"
+                                        ></span>
+                                        <span
+                                            class="vendor-value"
+                                            v-text="value"
+                                        ></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry Toast Notifications -->
+            <div id="telemetry-toast" class="telemetry-toast">
+                <div class="d-flex align-items-center">
+                    <i class="bi me-2"></i>
+                    <div class="flex-grow-1">
+                        <strong class="toast-title"></strong>
+                        <div class="toast-message"></div>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn-close btn-close-sm ms-2"
+                        @click="hideTelemetryToast()"
+                    ></button>
+                </div>
+            </div>
+
+            <!-- Authentication Modal -->
+            <div v-if="showAuthModal" class="auth-modal" @click.self="showAuthModal = false">
+                <div class="auth-modal-content">
+                    <div class="auth-modal-header">
+                        <h5>Authentication</h5>
+                        <button type="button" class="btn-close" @click="showAuthModal = false"></button>
+                    </div>
+                    <div class="auth-modal-body">
+                        <div v-if="!authToken" class="auth-form">
+                            <div class="mb-3">
+                                <label for="jwtToken" class="form-label">JWT Token</label>
+                                <textarea
+                                    id="jwtToken"
+                                    v-model="authTokenInput"
+                                    class="form-control"
+                                    rows="4"
+                                    placeholder="Paste your JWT token here..."
+                                    @keydown.enter.ctrl="submitAuthToken"
+                                ></textarea>
+                                <small class="form-text text-muted">
+                                    Enter your JWT Bearer token to authenticate API requests
+                                </small>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input"
+                                        id="persistToken"
+                                        v-model="persistToken"
+                                    >
+                                    <label class="form-check-label" for="persistToken">
+                                        Remember token (stores in localStorage)
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        If unchecked, token will be cleared when you close the tab
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-secondary" @click="showAuthModal = false">
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    @click="submitAuthToken"
+                                    :disabled="!authTokenInput.trim()"
+                                >
+                                    Authenticate
+                                </button>
+                            </div>
+                        </div>
+                        <div v-else class="auth-info">
+                            <div class="alert alert-success">
+                                <i class="bi bi-shield-check"></i>
+                                <strong>Authenticated</strong>
+                            </div>
+                            <div v-if="authTokenClaims" class="token-info">
+                                <div class="info-row">
+                                    <span class="info-label">Subject:</span>
+                                    <span class="info-value" v-text="authTokenClaims.sub || 'N/A'"></span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Issuer:</span>
+                                    <span class="info-value" v-text="authTokenClaims.iss || 'N/A'"></span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Audience:</span>
+                                    <span class="info-value" v-text="authTokenClaims.aud || 'N/A'"></span>
+                                </div>
+                                <div v-if="authTokenExpiry" class="info-row">
+                                    <span class="info-label">Expires:</span>
+                                    <span class="info-value" v-text="formatTokenExpiry()"></span>
+                                </div>
+                                <div v-if="tokenExpiryWarning" class="alert alert-warning mt-2">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    Token expires soon!
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2 mt-3">
+                                <button type="button" class="btn btn-secondary" @click="showAuthModal = false">
+                                    Close
+                                </button>
+                                <button type="button" class="btn btn-danger" @click="logout">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts Help Modal -->
+            <div v-if="showKeyboardHelp" class="keyboard-help-modal" @click.self="showKeyboardHelp = false">
+                <div class="keyboard-help-content">
+                    <div class="keyboard-help-header">
+                        <h5>Keyboard Shortcuts</h5>
+                        <button type="button" class="btn-close" @click="showKeyboardHelp = false"></button>
+                    </div>
+                    <div class="keyboard-help-body">
+                        <div class="shortcut-section">
+                            <h6>Navigation</h6>
+                            <div class="shortcut-item">
+                                <kbd>↑</kbd> <kbd>↓</kbd>
+                                <span>Navigate up/down in tree</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>←</kbd> <kbd>→</kbd>
+                                <span>Collapse/expand components</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Enter</kbd>
+                                <span>Select focused item</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Home</kbd> <kbd>End</kbd>
+                                <span>Jump to first/last item</span>
+                            </div>
+                        </div>
+                        <div class="shortcut-section">
+                            <h6>Global</h6>
+                            <div class="shortcut-item">
+                                <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd>
+                                <span>Focus filter input</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Esc</kbd>
+                                <span>Clear selection/close dialogs</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>?</kbd>
+                                <span>Show this help</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Tab</kbd>
+                                <span>Navigate between panels</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="keyboard-help-footer">
+                        <small class="text-muted">Press <kbd>Esc</kbd> to close</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component Tree Item Template -->
+        <script type="text/x-template" id="component-tree-item-template">
+            <li class="component-item" :class="{ 'nested-component': level > 0 }">
+                <div
+                    class="component-header"
+                    :class="{
+                        selected: selectedItem && selectedItem.type === 'component' && selectedItem.id === component.id,
+                        'nested-level': level > 0,
+                        'indent-1': level === 1,
+                        'indent-2': level === 2,
+                        'indent-3': level === 3,
+                        'indent-4': level >= 4
+                    }"
+                    :data-component-id="component.id"
+                    @click="handleComponentClick"
+                    tabindex="0"
+                    role="treeitem"
+                    :aria-expanded="isExpanded ? 'true' : 'false'"
+                    :aria-selected="selectedItem && selectedItem.type === 'component' && selectedItem.id === component.id"
+                >
+                    <i
+                        v-if="hasExpandableContent"
+                        class="bi bi-caret-right-fill expand-icon"
+                        :class="{ expanded: isExpanded }"
+                        @click.stop="$emit('toggle-expand', component.id)"
+                    ></i>
+                    <span v-else class="expand-spacer"></span>
+                    <i :class="level > 0 ? 'bi bi-box-seam' : 'bi bi-box'"></i>
+                    <span v-text="component.name || component.id"></span>
+                </div>
+
+                <!-- Subcomponents -->
+                <ul v-if="isExpanded && component.subcomponents && component.subcomponents.length > 0" class="subcomponent-list">
+                    <component-tree-item
+                        v-for="subcomponent in component.subcomponents"
+                        :key="subcomponent.id"
+                        :component="subcomponent"
+                        :level="level + 1"
+                        :selected-item="selectedItem"
+                        :expanded-components="expandedComponents"
+                        :get-resource-icon="getResourceIcon"
+                        :format-resource-name="formatResourceName"
+                        @select-component="$emit('select-component', $event)"
+                        @select-resource="$emit('select-resource', $event)"
+                        @toggle-expand="$emit('toggle-expand', $event)"
+                    ></component-tree-item>
+                </ul>
+
+                <!-- Resources -->
+                <ul v-if="isExpanded && component.resources && component.resources.length > 0" class="resource-list">
+                    <template v-for="(resource, rIndex) in component.resources" :key="resource.key">
+                        <li
+                            v-if="resource.key !== 'subcomponents'"
+                            class="resource-item"
+                        :class="{
+                            selected: selectedItem && selectedItem.type === 'resource' && selectedItem.key === resource.key && selectedItem.componentId === component.id,
+                            'resource-indent-1': level === 0,
+                            'resource-indent-2': level === 1,
+                            'resource-indent-3': level === 2,
+                            'resource-indent-4': level === 3,
+                            'resource-indent-5': level >= 4
+                        }"
+                        :data-resource-id="`${component.id}-${rIndex}`"
+                        @click.stop="handleResourceClick(resource)"
+                        tabindex="-1"
+                        role="treeitem"
+                        :aria-selected="selectedItem && selectedItem.type === 'resource' && selectedItem.key === resource.key && selectedItem.componentId === component.id"
+                    >
+                        <i :class="getResourceIcon(resource.key)"></i>
+                        <span v-text="formatResourceName(resource.key)"></span>
+                    </li>
+                    </template>
+                </ul>
+            </li>
+        </script>
+
+        <script src="./js/vue.global.js"></script>
+        <script src="./js/bootstrap.bundle.min.js"></script>
+        <script src="./js/app.js"></script>
+    </body>
+</html>

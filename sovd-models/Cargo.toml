@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "sovd-models"
+description = "SOVD (ISO 17978) models and types"
+readme = "README.md"
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+authors = { workspace = true }
+
+[features]
+default = ["jsonschema-schemars"]
+jsonschema = []
+jsonschema-schemars = ["schemars/derive", "jsonschema"]
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+schemars = { workspace = true, optional = true, features = ["std"] }
+derive_more = { workspace = true, features = ["display", "error", "from"] }

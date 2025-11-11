@@ -1,0 +1,30 @@
+name: Nightly
+
+on:
+  schedule:
+    # Run at 02:00 UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: CI with latest stable Rust
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    with:
+      rust_version: stable
+
+  release:
+    name: Create nightly release
+    needs: ci
+    uses: ./.github/workflows/release.yaml
+    permissions:
+      contents: write
+      actions: read
+    with:
+      release_tag: nightly
+      release_title: Nightly Build
+      run_id: ${{ needs.ci.outputs.run_id }}

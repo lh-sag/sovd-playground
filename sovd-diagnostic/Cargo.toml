@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "sovd-diagnostic"
+description = "Diagnostic entity system for SOVD"
+edition = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+
+[features]
+default = []
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+derive_more = { workspace = true, features = ["display", "error", "debug", "from"] }
+tokio = { workspace = true, features = ["sync"] }
+async-trait = { workspace = true }
+toml = { workspace = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }

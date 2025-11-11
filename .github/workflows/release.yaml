@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag name'
+        required: true
+        type: string
+      release_title:
+        description: 'Release title'
+        required: true
+        type: string
+      run_id:
+        description: 'Workflow run ID to download artifacts from'
+        required: true
+        type: string
+
+env:
+  GIT_CLIFF_VERSION: 2.10.1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@${{ env.GIT_CLIFF_VERSION }}
+
+      - name: Set release metadata
+        id: meta
+        run: |
+          echo "tag=${{ inputs.release_tag }}" >> $GITHUB_OUTPUT
+          echo "title=${{ inputs.release_title }}" >> $GITHUB_OUTPUT
+          echo "run-id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.meta.outputs.run-id }}
+          path: release-assets
+
+      - name: Verify artifacts downloaded
+        run: |
+          if [ ! -d "release-assets" ] || [ -z "$(ls -A release-assets 2>/dev/null)" ]; then
+            echo "Error: No artifacts downloaded from CI workflow run ${{ steps.meta.outputs.run-id }}"
+            exit 1
+          fi
+          echo "Successfully downloaded artifacts:"
+          ls -la release-assets/
+
+      - name: Prepare release assets
+        run: |
+          cd release-assets
+
+          # Extract artifacts
+          for zip_file in *.zip; do
+            [ -f "$zip_file" ] || continue
+            echo "Extracting $zip_file"
+            unzip -o "$zip_file"
+            rm "$zip_file"
+          done
+
+          # Move binaries to root
+          find . -type f \( -name "sovd-gateway-*" -o -name "sovd-gateway" -o -name "sovd-gateway.exe" \) | while read -r binary; do
+            [ "$binary" != "./$(basename "$binary")" ] && mv "$binary" "./$(basename "$binary")"
+          done
+
+          # Remove empty directories
+          find . -type d -empty -delete
+
+          cd ..
+          echo "Final release assets:"
+          ls -la release-assets/
+
+      - name: Generate changelog
+        run: |
+          if git-cliff --unreleased --output CHANGELOG.md; then
+            echo "✓ Generated changelog with git-cliff"
+          else
+            echo "## ${{ steps.meta.outputs.title }}" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "Built from commit $(git rev-parse --short HEAD)" >> CHANGELOG.md
+          fi
+          cp CHANGELOG.md release-assets/
+
+      - name: Create or update release
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+
+          # Delete existing release and tag if they exist
+          if gh release view "$TAG" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Deleting existing '$TAG' release..."
+            gh release delete "$TAG" --repo ${{ github.repository }} --yes
+          fi
+
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "Deleting existing '$TAG' tag..."
+            git push --delete origin "$TAG" || true
+          fi
+
+          gh release create "$TAG" \
+            --repo ${{ github.repository }} \
+            --title "${{ steps.meta.outputs.title }}" \
+            --notes-file CHANGELOG.md \
+            --prerelease \
+            release-assets/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Update tag
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          # Create/update the tag to point to current commit
+          git tag -f "$TAG"
+          git push origin "$TAG" --force
