@@ -48,7 +48,7 @@ clap = { version = "4.5.42", default-features = false, features = [
     "std",
     "usage",
 ] }
-tokio = { version = "1.47.0", features = [
+tokio = { version = "1.48.0", features = [
     "net",
     "rt",
     "signal",
