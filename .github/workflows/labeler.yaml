@@ -1,0 +1,29 @@
+name: Labeler
+
+on:
+  pull_request:
+  pull_request_target:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-labeler:
+    name: Validate labeler configuration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/check-labeler.sh
+
+  label:
+    name: Auto-label pull requests
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/labeler@v6

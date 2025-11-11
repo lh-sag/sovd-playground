@@ -1,0 +1,26 @@
+doc:
+  - "**/*.md"
+  - "LICENSE"
+  - "NOTICE"
+
+ci:
+  - ".github/**"
+  - ".pre-commit-config.yaml"
+
+test:
+  - "tests/**"
+
+ui:
+  - "assets/**"
+
+crate:models:
+  - 'sovd-models/**'
+
+crate:server:
+  - 'sovd-server/**'
+
+crate:diagnostic:
+  - 'sovd-diagnostic/**'
+
+crate:cli:
+  - 'sovd-cli/**'

@@ -1,0 +1,80 @@
+name: Coverage
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+      COV_VERSION: 0.6.15
+      RUST_VERSION: 1.91.1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: llvm-tools-preview
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: coverage
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov@${{ env.COV_VERSION }}
+
+      - name: Build instrumented binary
+        run: cargo llvm-cov run --bin sovd-gateway --no-report -- --help
+
+      - name: Run unit tests with coverage
+        run: cargo llvm-cov --all-features --workspace --no-report
+
+      - name: Generate coverage reports
+        run: |
+          cargo llvm-cov report --json --summary-only --output-path coverage.json
+          cargo llvm-cov report --html --output-dir coverage/html
+
+      - name: Extract coverage and generate badge
+        run: |
+          COVERAGE=$(jq '.data[0].totals.lines | (.covered / .count * 100) | floor' coverage.json)
+
+          if [ "$COVERAGE" -ge 80 ]; then COLOR="brightgreen"
+          elif [ "$COVERAGE" -ge 60 ]; then COLOR="yellow"
+          elif [ "$COVERAGE" -ge 40 ]; then COLOR="orange"
+          else COLOR="red"
+          fi
+
+          curl -s "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" -o coverage/html/coverage-badge.svg
+          find coverage
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./coverage/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

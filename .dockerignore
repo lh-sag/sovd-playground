@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+# Exclude everything by default
+*
+
+# Include only what we need for the Docker image
+!docker-build/sovd-gateway-*
+!docker/entrypoint.sh
+!assets/

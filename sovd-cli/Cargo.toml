@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "sovd-cli"
+description = "CLI tools for SOVD"
+readme = "README.md"
+build = "build.rs"
+
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+version = { workspace = true }
+authors = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+default = [
+    "jsonschema-schemars",
+    "openssl",
+    "ui",
+]
+ui = [
+    "sovd-server/ui",
+]
+jsonschema-schemars = [
+    "schemars/derive",
+    "sovd-models/jsonschema-schemars",
+]
+openssl = [
+    "sovd-server/openssl",
+    "dep:openssl",
+]
+
+[[bin]]
+name = "sovd-gateway"
+path = "gateway/src/main.rs"
+
+[lib]
+name = "libsovd"
+path = "libsovd/src/lib.rs"
+
+[dependencies]
+clap = { workspace = true }
+sovd-diagnostic = { workspace = true }
+sovd-server = { workspace = true, features = [
+    "openssl",
+] }
+sovd-models = { workspace = true }
+tokio = { workspace = true, features = [
+    "macros",
+] }
+async-trait = { workspace = true }
+http = { workspace = true }
+openssl = { workspace = true, optional = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true, optional = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+derive_more = { workspace = true, features = [
+    "display",
+    "from",
+] }
+tracing-log = { workspace = true }
+log = { workspace = true }
+dashmap = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+futures-util = { workspace = true }
+uuid = { workspace = true }
+hyper = { workspace = true, features = ["client", "http1", "http2"] }
+hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
+http-body-util = { workspace = true }
+hyper-openssl = { workspace = true, optional = true }
+awc = { workspace = true }

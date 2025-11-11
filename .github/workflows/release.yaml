@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read
+      actions: read
+
+  deploy:
+    name: Create release and publish Docker image
+    needs: build
+    uses: ./.github/workflows/deploy.yaml
+    permissions:
+      contents: write
+      actions: read
+      packages: write
+    with:
+      release_tag: ${{ github.ref_name }}
+      release_title: Release ${{ github.ref_name }}
+      run_id: ${{ needs.build.outputs.run_id }}

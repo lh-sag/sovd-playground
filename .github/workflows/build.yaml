@@ -1,0 +1,135 @@
+name: Build and test
+
+on:
+  workflow_call:
+    inputs:
+      rust_version:
+        description: 'Rust toolchain version to use'
+        required: false
+        type: string
+        default: '1.91.1'
+    outputs:
+      run_id:
+        description: 'Workflow run ID for downloading artifacts'
+        value: ${{ jobs.gate.outputs.run_id }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PYTHON_VERSION: 3.13
+  PRE_COMMIT_VERSION: 4.2
+  COV_VERSION: 0.6.15
+  RUST_VERSION: 1.91.1
+  GIT_CLIFF_VERSION: 2.10.1
+
+jobs:
+  pre-commit:
+    name: Pre-commit checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        id: setup-uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: true
+          enable-cache: true
+          prune-cache: false
+          cache-dependency-glob: |
+            .github/workflows/build.yaml
+            .pre-commit-config.yaml
+      - name: Install pre-commit
+        if: steps.setup-uv.outputs.cache-hit != 'true'
+        run: uv tool install pre-commit@${{ env.PRE_COMMIT_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ env.PYTHON_VERSION }}-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_version || env.RUST_VERSION }}
+          components: rustfmt, clippy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Run pre-commit
+        run: uv tool run pre-commit run --all-files --show-diff-on-failure
+
+  build:
+    needs: [pre-commit]
+    name: Build and test (${{ matrix.os }}, ${{ matrix.profile }})
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025, macos-15]
+        profile: [release]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $DIR = "C:\Program Files\OpenSSL"
+          echo "OPENSSL_DIR=$DIR" >> $env:GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$DIR\lib\VC\$env:RUNNER_ARCH\MD" >> $env:GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$DIR\include" >> $env:GITHUB_ENV
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_version || env.RUST_VERSION }}
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-${{ matrix.os }}
+      - name: Get target triple
+        id: target
+        run: rustc -vV | grep host | awk '{print "triple=" $2}' >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Build
+        run: cargo build --locked --workspace --all-targets --all-features --profile ${{ matrix.profile }}
+      - name: Test
+        run: cargo test --locked --workspace --all-targets --all-features --profile ${{ matrix.profile }}
+      - name: Doc test
+        run: cargo test --locked --workspace --doc --all-features --profile ${{ matrix.profile }}
+      - name: Rename binary with target triple
+        run: |
+          mv "target/${{ matrix.profile }}/sovd-gateway${{ runner.os == 'Windows' && '.exe' || '' }}" \
+             "target/${{ matrix.profile }}/sovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}"
+        shell: bash
+      - name: Upload sovd-gateway binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
+          path: |
+            target/${{ matrix.profile }}/sovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error
+          retention-days: 5
+
+  integration-tests:
+    name: Python Integration Tests
+    needs: build
+    uses: ./.github/workflows/integration-tests.yaml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      run_id: ${{ github.run_id }}
+      rust_version: ${{ inputs.rust_version || '1.91.1' }}
+
+  gate:
+    name: CI Gate
+    needs: [pre-commit, build, integration-tests]
+    runs-on: ubuntu-24.04
+    outputs:
+      run_id: ${{ github.run_id }}
+    steps:
+      - run: true

@@ -1,0 +1,30 @@
+name: first-interaction
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  first-interaction:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/first-interaction@v2
+        with:
+          issue-message: |
+            Hi @${{ github.event.issue.user.login }},
+
+            Thanks for opening your first issue!
+            We appreciate your contribution and will review it as soon as possible.
+          pr-message: |
+            Hi @${{ github.event.pull_request.user.login }},
+
+            Thanks for your first pull request!
+
+            Please make sure you have run the pre-commit hooks as documented in CONTRIBUTING.md.
+
+            We appreciate your contribution and will review it as soon as possible.

@@ -1,0 +1,12 @@
+debug/
+target/
+
+sovd-ui/node_modules
+sovd-ui/dist
+sovd-ui/tsconfig.ts
+
+**/*.rs.bk
+*.pdb
+
+__pycache__/
+*.pyc

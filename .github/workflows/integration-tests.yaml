@@ -1,0 +1,83 @@
+name: Integration Tests
+
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to download artifacts from'
+        required: true
+        type: string
+      rust_version:
+        description: 'Rust toolchain version'
+        required: false
+        type: string
+        default: '1.91.1'
+      python_version:
+        description: 'Python version'
+        required: false
+        type: string
+        default: '3.13'
+
+jobs:
+  integration-tests:
+    name: Python Integration Tests (${{ matrix.os }}, ${{ matrix.profile }})
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+        profile: [release]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_version }}
+      - name: Get target triple
+        id: target
+        run: rustc -vV | grep host | awk '{print "triple=" $2}' >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Download sovd-gateway binary
+        uses: actions/download-artifact@v4
+        with:
+          name: sovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
+          path: ./binaries
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Make binary executable (Unix)
+        if: runner.os != 'Windows'
+        run: chmod +x ./binaries/sovd-gateway-${{ steps.target.outputs.triple }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ inputs.python_version }}
+          activate-environment: true
+          enable-cache: true
+          prune-cache: false
+      - name: Install Python dependencies
+        run: uv sync --locked --no-group tools
+      - name: Get Playwright cache directory
+        id: playwright-cache-path
+        run: |
+          case "${{ runner.os }}" in
+            Linux) PATH="/home/runner/.cache/ms-playwright" ;;
+            macOS) PATH="/Users/runner/Library/Caches/ms-playwright" ;;
+            Windows) PATH="C:\\Users\\runneradmin\\AppData\\Local\\ms-playwright" ;;
+          esac
+          echo "path=$PATH" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.playwright-cache-path.outputs.path }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: uv run playwright install chromium
+      - name: Run pytest with pre-built binary
+        run: uv run pytest -v -s --sovd-gateway-bin=./binaries/sovd-gateway-${{ steps.target.outputs.triple }}${{ runner.os == 'Windows' && '.exe' || '' }}

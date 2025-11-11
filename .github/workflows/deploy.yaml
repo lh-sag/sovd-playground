@@ -1,0 +1,166 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag name'
+        required: true
+        type: string
+      release_title:
+        description: 'Release title'
+        required: true
+        type: string
+      run_id:
+        description: 'Workflow run ID to download artifacts from'
+        required: true
+        type: string
+
+env:
+  GIT_CLIFF_VERSION: 2.10.1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@${{ env.GIT_CLIFF_VERSION }}
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: sovd-gateway-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate changelog
+        run: git-cliff --unreleased --output CHANGELOG.md
+
+      - name: Create or update release
+        run: |
+          TAG="${{ inputs.release_tag }}"
+
+          if [[ ! "$TAG" =~ ^v[0-9] ]]; then
+            gh release delete "$TAG" --yes 2>/dev/null || true
+            git push --delete origin "$TAG" 2>/dev/null || true
+            PRERELEASE="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --title "${{ inputs.release_title }}" \
+            --notes-file CHANGELOG.md \
+            --target "${{ github.sha }}" \
+            ${PRERELEASE:-} \
+            release-assets/*
+
+          if [[ ! "$TAG" =~ ^v[0-9] ]]; then
+            git tag -f "$TAG"
+            git push origin "$TAG" --force
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  docker-publish:
+    name: Build and push Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+
+    env:
+      DOCKER_BUILD_SUMMARY: false
+      DOCKER_BUILD_RECORD_UPLOAD: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: sovd-gateway-*-linux-gnu-release
+          path: ./docker-build
+          merge-multiple: true
+
+      - name: Prepare binaries for Docker
+        run: |
+          cd docker-build
+          mv sovd-gateway-x86_64-unknown-linux-gnu sovd-gateway-amd64
+          mv sovd-gateway-aarch64-unknown-linux-gnu sovd-gateway-arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/sovd-gateway
+          tags: type=raw,value=${{ inputs.release_tag }}
+          labels: |
+            org.opencontainers.image.title=SOVD Gateway
+            org.opencontainers.image.description=SOVD Playground - ISO 17978-3 Service-Oriented Vehicle Diagnostics
+            org.opencontainers.image.vendor=Liebherr-Digital Development Center GmbH
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          load: true
+          platforms: linux/amd64
+          tags: sovd-gateway:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          docker run -d --name test -p 9000:9000 sovd-gateway:test
+          sleep 3
+
+          COMMIT=$(git rev-parse --short HEAD)
+          VERSION=$(curl -s http://localhost:9000/sovd/version-info | jq -r '.sovd_info[0].vendor_info.version')
+
+          docker stop test
+          docker rm test
+
+          [[ "$VERSION" == *"$COMMIT"* ]] || exit 1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: |
+            index:org.opencontainers.image.description=SOVD Playground - ISO 17978-3 Service-Oriented Vehicle Diagnostics
+          cache-from: type=gha

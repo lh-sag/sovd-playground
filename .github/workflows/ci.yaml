@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read
+      actions: read
+
+  release:
+    name: Create latest release
+    needs: build
+    uses: ./.github/workflows/deploy.yaml
+    permissions:
+      contents: write
+      actions: read
+      packages: write
+    with:
+      release_tag: latest
+      release_title: Latest Development Build
+      run_id: ${{ needs.build.outputs.run_id }}
