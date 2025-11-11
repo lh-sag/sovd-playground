@@ -1,0 +1,28 @@
+name: Nightly
+
+on:
+  schedule:
+    # Run at 02:00 UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read
+      actions: read
+
+  release:
+    name: Create nightly release
+    needs: build
+    uses: ./.github/workflows/deploy.yaml
+    permissions:
+      contents: write
+      actions: read
+      packages: write
+    with:
+      release_tag: nightly
+      release_title: Nightly Build
+      run_id: ${{ needs.build.outputs.run_id }}

@@ -1,0 +1,66 @@
+# SOVD Gateway Configuration
+
+# Each [[servers]] entry represents a complete server endpoint configuration
+# including its URL, optional authentication, and optional SSL settings
+
+[[servers]]
+name = "HTTP API"
+listen = "127.0.0.1:9000"
+server_name = ["127.0.0.1", "localhost"]  # Optional: restrict to specific hostnames. Empty = accept all
+base = "/sovd"
+
+#[servers.auth]
+#jwt_public_key_path = "./gen/jwt-keys/public_key.pem"
+
+# Example: HTTPS server with mTLS and JWT authentication
+# To generate certificates, run: ./scripts/mkcerts.sh
+# This will create certificates in ./gen/certs/
+#
+# [[servers]]
+# name = "Secure HTTPS with mTLS"
+# listen = "127.0.0.1:8443"
+# server_name = ["127.0.0.1", "localhost"]
+# base = "/sovd"
+# [servers.auth]
+# jwt_public_key_path = "./gen/jwt-keys/public_key.pem"
+# [servers.ssl]
+# cert = "./gen/certs/server-cert.pem"
+# key = "./gen/certs/server-key.pem"
+# cacert = "./gen/certs/ca-cert.pem"
+# insecure = false
+# no_peer_cert = false  # Requires client certificate
+
+# Example: HTTPS server without client certificates
+# [[servers]]
+# name = "Public HTTPS"
+# listen = "0.0.0.0:9443"
+# base = "/sovd"
+# [servers.ssl]
+# cert = "./gen/certs/server-cert.pem"
+# key = "./gen/certs/server-key.pem"
+# cacert = "./gen/certs/ca-cert.pem"
+# insecure = false
+# no_peer_cert = true  # No client certificate required
+
+# Example: Development HTTPS with self-signed certificates
+# [[servers]]
+# name = "Dev HTTPS"
+# listen = "localhost:9001"
+# base = "/sovd"
+# [servers.ssl]
+# cert = "./gen/certs/server-cert.pem"
+# key = "./gen/certs/server-key.pem"
+# insecure = true  # Skip certificate verification
+# no_peer_cert = true  # No client certificate required
+
+# Example: Unix domain socket
+# [[servers]]
+# name = "Unix Socket"
+# listen = "unix:/var/run/sovd.sock"
+# base = "/sovd"
+
+# Example: Abstract Unix socket (Linux only)
+# [[servers]]
+# name = "Abstract Socket"
+# listen = "unix:/@sovd"
+# base = "/sovd"

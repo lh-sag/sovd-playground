@@ -1,0 +1,123 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+[workspace]
+members = [
+    "sovd-models",
+    "sovd-server",
+    "sovd-cli",
+    "sovd-diagnostic",
+]
+resolver = "2"
+
+[workspace.package]
+authors = [
+    "Sanimir Agovic <sanimig.agovic@liebherr.com>",
+]
+description = "SOVD (ISO 17978) toolbox"
+edition = "2024"
+homepage = "https://github.com/lh-sag/sovd-playground"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/lh-sag/sovd-playground"
+version = "0.0.1"
+
+[workspace.dependencies]
+sovd-models = { version = "0.0.1", path = "sovd-models" }
+sovd-diagnostic = { version = "0.0.1", path = "sovd-diagnostic" }
+sovd-server = { version = "0.0.1", path = "sovd-server" }
+async-trait = "0.1"
+awc = { version = "3.5", default-features = false }
+tracing-log = { version = "0.2.0", default-features = false, features = [
+    "log-tracer",
+] }
+log = { version = "0.4", default-features = false, features = [
+    "std",
+] }
+serde = { version = "1.0.219", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+serde_json = { version = "1.0.133", default-features = false, features = [
+    "alloc",
+] }
+clap = { version = "4.5.42", default-features = false, features = [
+    "cargo",
+    "derive",
+    "env",
+    "help",
+    "std",
+    "usage",
+] }
+tokio = { version = "1.47.0", features = [
+    "net",
+    "rt",
+    "signal",
+    "time",
+], default-features = false }
+actix-web = { version = "4.9.0", default-features = false, features = [
+    "macros",
+] }
+actix-files = { version = "0.6.6", default-features = false }
+tracing = { version = "0.1.41", default-features = false }
+tracing-subscriber = { version = "0.3.19", features = [
+    "alloc",
+    "fmt",
+    "env-filter",
+    "std",
+], default-features = false }
+openssl = { version = "0.10.73", default-features = false }
+futures-core = { version = "0.3.31", default-features = false, features = [
+    "alloc",
+] }
+derive_more = { version = "2.0", default-features = false, features = ["display", "error", "from", "debug"] }
+
+http = { version = "1.1", default-features = false, features = [
+    "std",
+] }
+schemars = { version = "1.0.4", default-features = false }
+hyper = { version = "1.7.0", default-features = false }
+hyper-util = { version = "0.1.16", default-features = false }
+http-body-util = { version = "0.1", default-features = false }
+url = { version = "2.5", default-features = false }
+uriparse = { version = "0.6", default-features = false }
+urlencoding = { version = "2.1", default-features = false }
+hyper-openssl = { version = "0.10", default-features = false }
+# Multipart handling for bulk-data
+actix-multipart = { version = "0.7", default-features = false }
+# Async streams and utilities
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+bytes = { version = "1.5", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "alloc"] }
+uuid = { version = "1.10", default-features = false, features = ["v4", "std"] }
+tokio-openssl = { version = "0.6", default-features = false }
+toml = { version = "0.8", default-features = false, features = [
+    "parse",
+] }
+opentelemetry = { version = "0.24", default-features = false, features = [
+    "metrics",
+    "trace",
+] }
+jsonwebtoken = { version = "9", default-features = false, features = [
+    "use_pem",
+] }
+dashmap = { version = "6.0", default-features = false }
+
+[workspace.lints.rust]
+unused = "deny"
+unsafe_code = "deny"
+dead_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = "deny"
+clone_on_ref_ptr = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+unwrap_used = "deny"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+panic = "abort"
+strip = true

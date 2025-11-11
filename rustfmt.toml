@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+group_imports = "StdExternalCrate"
+style_edition = "2024"
+max_width = 120
