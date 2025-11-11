@@ -91,7 +91,7 @@ opentelemetry = { version = "0.24", default-features = false, features = [
     "metrics",
     "trace",
 ] }
-jsonwebtoken = { version = "9", default-features = false, features = [
+jsonwebtoken = { version = "10", default-features = false, features = [
     "use_pem",
 ] }
 
