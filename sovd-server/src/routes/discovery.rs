@@ -1,16 +1,8 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
 //
-//! Discovery module - Entity discovery and relationship endpoints
-//!
-//! This module implements the ISO 17978-3 discovery endpoints for:
-//! - Entity collection listing (components, areas, apps, functions)
-//! - Entity capability retrieval
-//! - Entity relationship navigation (hosts, related entities)
-//!
-//! Reference: ISO_17978-3_OpenAPI-Method-Definitions_2024/discovery/discovery.yaml
 
-use actix_web::{HttpRequest, HttpResponse, http, web};
+use actix_web::{HttpRequest, HttpResponse, web};
 use sovd_diagnostic::{Diagnostic, EntityType};
 use sovd_models::{
     IncludeSchemaQuery,
@@ -26,20 +18,13 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/components")
             .route("", web::get().to(list_entities))
-            .route("", web::route().method(http::Method::OPTIONS).to(handle_options))
             .service(
                 web::scope("/{id}")
                     .route("", web::get().to(list_capabilities))
-                    .route("/hosts", web::get().to(list_hosts)),
+                    .route("/hosts", web::get().to(list_hosts))
+                    .configure(super::data::configure),
             ),
     );
-}
-
-// OPTIONS /components
-async fn handle_options() -> HttpResponse {
-    HttpResponse::NoContent()
-        .insert_header(("Allow", "OPTIONS, GET"))
-        .finish()
 }
 
 // GET GET /{entity-collection}

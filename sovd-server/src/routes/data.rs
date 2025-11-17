@@ -14,24 +14,21 @@ use crate::convert::{data_value_to_rest, parse_categories};
 use crate::response::create_api_response;
 
 pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/components/{component_id}")
-            .route("/data", web::get().to(list_data_resources))
-            .route("/data/{data_id}", web::get().to(get_data_value))
-            .route("/data/{data_id}", web::put().to(set_data_value))
-            .route("/data-categories", web::get().to(list_data_categories))
-            .route("/data-groups", web::get().to(list_data_groups)),
-    );
+    cfg.route("/data", web::get().to(list_data_resources))
+        .route("/data/{data_id}", web::get().to(get_data_value))
+        .route("/data/{data_id}", web::put().to(set_data_value))
+        .route("/data-categories", web::get().to(list_data_categories))
+        .route("/data-groups", web::get().to(list_data_groups));
 }
 
 /// List data resources for a component
 /// GET /components/{component-id}/data?categories[]=currentData&groups[]=engine&include-schema=true
 pub(super) async fn list_data_resources(
-    component_id: web::Path<String>,
+    id: web::Path<String>,
     query: Result<web::Query<DataResourceQuery>, actix_web::Error>,
     diagnostic: web::Data<Diagnostic>,
 ) -> Result<HttpResponse, crate::response::ApiError> {
-    let component_id = component_id.as_str();
+    let component_id = id.as_str();
     debug!(component_id = %component_id, "List data resources");
     let entity_id = EntityId::component(component_id.to_string());
 
@@ -131,14 +128,14 @@ pub(super) async fn set_data_value(
 /// List data categories for a component
 /// GET /components/{component-id}/data-categories
 pub(super) async fn list_data_categories(
-    component_id: web::Path<String>,
+    id: web::Path<String>,
     diagnostic: web::Data<Diagnostic>,
     query: Result<web::Query<IncludeSchemaQuery>, actix_web::Error>,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let query = query.unwrap_or_else(|_| web::Query(IncludeSchemaQuery::default()));
     let include_schema = query.include_schema;
 
-    let component_id = component_id.as_str();
+    let component_id = id.as_str();
     let entity_id = EntityId::component(component_id.to_string());
 
     // Get the component and its DataService
@@ -164,11 +161,11 @@ pub(super) async fn list_data_categories(
 /// List data groups for a component
 /// GET /components/{component-id}/data-groups?category=currentData
 pub(super) async fn list_data_groups(
-    component_id: web::Path<String>,
+    id: web::Path<String>,
     query: Result<web::Query<DataGroupQuery>, actix_web::Error>,
     diagnostic: web::Data<Diagnostic>,
 ) -> Result<HttpResponse, crate::response::ApiError> {
-    let component_id = component_id.as_str();
+    let component_id = id.as_str();
     let entity_id = EntityId::component(component_id.to_string());
 
     // Get the component and its DataService

@@ -47,8 +47,7 @@ fn configure<T>(
     let scope = scope.configure(routes::version::configure::<T>).service(
         web::scope("v1")
             .configure(routes::root::configure)
-            .configure(routes::discovery::configure)
-            .configure(routes::data::configure),
+            .configure(routes::discovery::configure),
     );
 
     // Apply auth middleware if provided and add to config
