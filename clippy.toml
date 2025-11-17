@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+# Allow unwrap usage in test code
+allow-unwrap-in-tests = true
