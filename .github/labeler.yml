@@ -1,26 +1,36 @@
 doc:
-  - "**/*.md"
-  - "LICENSE"
-  - "NOTICE"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "LICENSE"
+          - "NOTICE"
 
 ci:
-  - ".github/**"
-  - ".pre-commit-config.yaml"
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - ".pre-commit-config.yaml"
 
 test:
-  - "tests/**"
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
 
 ui:
-  - "assets/**"
+  - changed-files:
+      - any-glob-to-any-file: "assets/**"
 
 crate:models:
-  - 'sovd-models/**'
+  - changed-files:
+      - any-glob-to-any-file: "sovd-models/**"
 
 crate:server:
-  - 'sovd-server/**'
+  - changed-files:
+      - any-glob-to-any-file: "sovd-server/**"
 
 crate:diagnostic:
-  - 'sovd-diagnostic/**'
+  - changed-files:
+      - any-glob-to-any-file: "sovd-diagnostic/**"
 
 crate:cli:
-  - 'sovd-cli/**'
+  - changed-files:
+      - any-glob-to-any-file: "sovd-cli/**"
