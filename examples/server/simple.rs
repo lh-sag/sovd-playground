@@ -14,8 +14,7 @@ use sovd_server::{Server, ServerConfig};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Setup basic logging
-    tracing_subscriber::fmt::init();
+    examples::init_logging();
 
     // Create diagnostic with engine component and data service
     let diagnostic = DiagnosticBuilder::new()

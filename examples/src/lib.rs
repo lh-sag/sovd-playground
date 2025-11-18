@@ -10,6 +10,15 @@ use sovd_diagnostic::{
     data::{DataCategory, DataCategoryInformation, DataError, DataService, DataValue, ValueGroup, ValueMetaData},
 };
 
+pub fn init_logging() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,actix_server=warn,actix_web=warn")),
+        )
+        .init();
+}
+
 /// Simple engine component
 pub struct Engine;
 
