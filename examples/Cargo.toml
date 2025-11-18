@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "examples"
+description = "SOVD examples"
+publish = false
+
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+version = { workspace = true }
+authors = { workspace = true }
+
+[[example]]
+name = "simple-server"
+path = "server/simple.rs"
+
+[dependencies]
+sovd-diagnostic = { workspace = true }
+sovd-server = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
