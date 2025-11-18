@@ -6,9 +6,8 @@
 //! This module provides the bridging layer between sovd-diagnostic and
 //! sovd-models without creating direct dependencies between them.
 
-use sovd_diagnostic::{DataCategory, DataError, DataValue, Entity, EntityType};
+use sovd_diagnostic::{DataCategory, DataError, DataValue};
 use sovd_models::data::ReadValue;
-use sovd_models::entity::{EntityId, EntityReference};
 
 use crate::response::ApiError;
 
@@ -86,29 +85,5 @@ fn generate_schema_for_value(_id: &str, value: &serde_json::Value) -> serde_json
         serde_json::Value::Null => json!({
             "type": "null"
         }),
-    }
-}
-
-pub fn entity_to_reference(entity: &dyn Entity, base_uri: &str, entity_type: EntityType) -> EntityReference {
-    let collection = match entity_type {
-        EntityType::Component => "components",
-        EntityType::SovdServer => "", // Root has no collection path
-    };
-
-    let href = if collection.is_empty() {
-        // Root SovdServer gets base URI only
-        base_uri.to_string()
-    } else {
-        format!("{}/v1/{}/{}", base_uri.trim_end_matches('/'), collection, entity.id())
-    };
-
-    EntityReference {
-        entity: EntityId {
-            id: entity.id().to_string(),
-            name: entity.name().to_string(),
-            translation_id: entity.translation_id().map(|s| s.to_string()),
-        },
-        href,
-        tags: entity.tags().to_vec(),
     }
 }

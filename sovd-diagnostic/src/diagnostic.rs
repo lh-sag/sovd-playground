@@ -78,6 +78,12 @@ pub struct EntityContext {
     services: Vec<(TypeId, Arc<dyn Any + Send + Sync>)>,
 }
 
+impl Default for EntityContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EntityContext {
     pub fn new() -> Self {
         Self { services: Vec::new() }

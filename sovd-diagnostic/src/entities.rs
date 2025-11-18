@@ -1,35 +1,6 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
 
-use derive_more::Display;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
-pub enum EntityType {
-    Component,
-    SovdServer,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
-#[display("{entity_type}:{id}")]
-pub struct EntityId {
-    pub entity_type: EntityType,
-    pub id: String,
-}
-
-impl EntityId {
-    pub fn new(entity_type: EntityType, id: String) -> Self {
-        Self { entity_type, id }
-    }
-
-    pub fn component(id: String) -> Self {
-        Self::new(EntityType::Component, id)
-    }
-
-    pub fn sovd_server() -> Self {
-        Self::new(EntityType::SovdServer, String::new())
-    }
-}
-
 /// Base trait for all SOVD entities
 pub trait Entity: Send + Sync {
     fn id(&self) -> &str;

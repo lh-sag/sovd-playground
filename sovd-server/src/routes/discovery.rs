@@ -3,7 +3,7 @@
 //
 
 use actix_web::{HttpRequest, HttpResponse, web};
-use sovd_diagnostic::{Diagnostic, EntityType};
+use sovd_diagnostic::Diagnostic;
 use sovd_models::{
     IncludeSchemaQuery,
     entity::{
@@ -42,7 +42,20 @@ async fn list_entities(
         .list_components()
         .into_iter()
         .map(|component| {
-            crate::convert::entity_to_reference(component.as_ref(), &base_uri.resolve_uri(&req), EntityType::Component)
+            let href = format!(
+                "{}/v1/components/{}",
+                base_uri.resolve_uri(&req).trim_end_matches('/'),
+                component.id()
+            );
+            EntityReference {
+                entity: ModelEntityId {
+                    id: component.id().to_string(),
+                    name: component.name().to_string(),
+                    translation_id: component.translation_id().map(|s| s.to_string()),
+                },
+                href,
+                tags: component.tags().to_vec(),
+            }
         })
         .collect();
 

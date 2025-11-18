@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use actix_web::{HttpResponse, web};
-use sovd_diagnostic::{Diagnostic, EntityId};
+use sovd_diagnostic::Diagnostic;
 use sovd_models::entity::DataWriteRequest;
 use sovd_models::{
     IncludeSchemaQuery,
@@ -30,7 +30,6 @@ pub(super) async fn list_data_resources(
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let component_id = id.as_str();
     debug!(component_id = %component_id, "List data resources");
-    let entity_id = EntityId::component(component_id.to_string());
 
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
@@ -45,7 +44,7 @@ pub(super) async fn list_data_resources(
         "Call data_service.list"
     );
     let items = data_service
-        .list(&entity_id, categories, groups)
+        .list(component_id, categories, groups)
         .await
         .map_err(crate::response::ApiError::from)?;
     debug!(component_id = %component_id, count = items.len(), "Data service list returned items");
@@ -63,14 +62,13 @@ pub(super) async fn get_data_value(
     diagnostic: web::Data<Diagnostic>,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let (component_id, data_id) = path.into_inner();
-    let entity_id = EntityId::component(component_id.clone());
 
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(&component_id)?;
 
     let query = query.unwrap_or_else(|_| web::Query(DataResourceQuery::default()));
     let include_schema = query.include_schema;
     let data_value = data_service
-        .read(&entity_id, &data_id)
+        .read(&component_id, &data_id)
         .await
         .map_err(crate::response::ApiError::from)?;
     let response = data_value_to_rest(data_value, include_schema);
@@ -87,12 +85,11 @@ pub(super) async fn set_data_value(
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let (component_id, data_id) = path.into_inner();
     let write_request = request.into_inner();
-    let entity_id = EntityId::component(component_id.clone());
 
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(&component_id)?;
 
     data_service
-        .write(&entity_id, &data_id, write_request.data)
+        .write(&component_id, &data_id, write_request.data)
         .await
         .map_err(crate::response::ApiError::from)?;
 
@@ -110,12 +107,11 @@ pub(super) async fn list_data_categories(
     let include_schema = query.include_schema;
 
     let component_id = id.as_str();
-    let entity_id = EntityId::component(component_id.to_string());
 
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
     let items = data_service
-        .list_categories(&entity_id)
+        .list_categories(component_id)
         .await
         .map_err(crate::response::ApiError::from)?;
 
@@ -132,7 +128,6 @@ pub(super) async fn list_data_groups(
     diagnostic: web::Data<Diagnostic>,
 ) -> Result<HttpResponse, crate::response::ApiError> {
     let component_id = id.as_str();
-    let entity_id = EntityId::component(component_id.to_string());
 
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
@@ -145,7 +140,7 @@ pub(super) async fn list_data_groups(
         .and_then(crate::convert::parse_single_category);
 
     let items = data_service
-        .list_groups(&entity_id, category)
+        .list_groups(component_id, category)
         .await
         .map_err(crate::response::ApiError::from)?;
 
