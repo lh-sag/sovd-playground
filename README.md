@@ -98,6 +98,10 @@ curl --silent --show-error http://127.0.0.1:9000/sovd/v1/components/engine/data 
 curl --silent --show-error http://127.0.0.1:9000/sovd/v1/components/engine/data/rpm | jq
 ```
 
+### Simple Server Example
+
+See [`examples/server/simple.rs`](examples/server/simple.rs) for a complete example with a mocked engine component.
+
 ## Testing
 
 ```bash

@@ -7,6 +7,7 @@ members = [
     "sovd-server",
     "sovd-cli",
     "sovd-diagnostic",
+    "examples",
 ]
 resolver = "2"
 
