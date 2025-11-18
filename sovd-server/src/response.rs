@@ -5,6 +5,7 @@
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use derive_more::{Display, From};
 use serde::Serialize;
+use sovd_diagnostic::ServiceError;
 use sovd_models::{
     ApiResponse, JsonSchema,
     error::{ErrorCode, GenericError},
@@ -89,6 +90,22 @@ impl ApiError {
     #[allow(dead_code)]
     pub fn conflict(message: impl Into<String>) -> Self {
         ApiError::new(ErrorCode::LockBroken, message)
+    }
+}
+
+impl From<ServiceError> for ApiError {
+    fn from(err: ServiceError) -> Self {
+        match err {
+            ServiceError::EntityNotFound { entity_id } => {
+                ApiError::not_found(format!("Entity '{entity_id}' not found"))
+            }
+            ServiceError::ServiceNotFound {
+                entity_id,
+                service_type,
+            } => ApiError::not_found(format!(
+                "Service '{service_type}' not available for entity '{entity_id}'"
+            )),
+        }
     }
 }
 

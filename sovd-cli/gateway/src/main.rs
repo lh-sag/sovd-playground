@@ -85,10 +85,8 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let fallback_ssl = config::SslConfig::from(&args.ssl);
 
     // Build diagnostic with mock components
-    let mut builder = sovd_diagnostic::DiagnosticBuilder::new();
-    for component in mock::create_mock_components() {
-        builder = builder.add_entity(component);
-    }
+    let builder = sovd_diagnostic::DiagnosticBuilder::new();
+    let builder = mock::create_mock_components(builder);
     let diagnostic = builder.build()?;
     let mut servers = Vec::new();
 

@@ -32,17 +32,7 @@ pub(super) async fn list_data_resources(
     debug!(component_id = %component_id, "List data resources");
     let entity_id = EntityId::component(component_id.to_string());
 
-    // Get the component and its DataService
-    let component = diagnostic.entities().get_entity(component_id).ok_or_else(|| {
-        debug!(component_id = %component_id, "Component not found in diagnostic system");
-        crate::response::ApiError::not_found(format!("Component '{component_id}' not found"))
-    })?;
-
-    debug!(component_id = %component_id, "Found component, check for data service");
-    let data_service = component.data_service().ok_or_else(|| {
-        debug!(component_id = %component_id, "Component has no data service");
-        crate::response::ApiError::not_found("Data service not available for this component")
-    })?;
+    let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
     let query = query.unwrap_or_else(|_| web::Query(DataResourceQuery::default()));
     let include_schema = query.include_schema;
@@ -75,15 +65,7 @@ pub(super) async fn get_data_value(
     let (component_id, data_id) = path.into_inner();
     let entity_id = EntityId::component(component_id.clone());
 
-    // Get the component and its DataService
-    let component = diagnostic
-        .entities()
-        .get_entity(&component_id)
-        .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-
-    let data_service = component
-        .data_service()
-        .ok_or_else(|| crate::response::ApiError::not_found("Data service not available for this component"))?;
+    let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(&component_id)?;
 
     let query = query.unwrap_or_else(|_| web::Query(DataResourceQuery::default()));
     let include_schema = query.include_schema;
@@ -107,15 +89,7 @@ pub(super) async fn set_data_value(
     let write_request = request.into_inner();
     let entity_id = EntityId::component(component_id.clone());
 
-    // Get the component and its DataService
-    let component = diagnostic
-        .entities()
-        .get_entity(&component_id)
-        .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-
-    let data_service = component
-        .data_service()
-        .ok_or_else(|| crate::response::ApiError::not_found("Data service not available for this component"))?;
+    let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(&component_id)?;
 
     data_service
         .write(&entity_id, &data_id, write_request.data)
@@ -138,15 +112,7 @@ pub(super) async fn list_data_categories(
     let component_id = id.as_str();
     let entity_id = EntityId::component(component_id.to_string());
 
-    // Get the component and its DataService
-    let component = diagnostic
-        .entities()
-        .get_entity(component_id)
-        .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-
-    let data_service = component
-        .data_service()
-        .ok_or_else(|| crate::response::ApiError::not_found("Data service not available for this component"))?;
+    let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
     let items = data_service
         .list_categories(&entity_id)
@@ -168,15 +134,7 @@ pub(super) async fn list_data_groups(
     let component_id = id.as_str();
     let entity_id = EntityId::component(component_id.to_string());
 
-    // Get the component and its DataService
-    let component = diagnostic
-        .entities()
-        .get_entity(component_id)
-        .ok_or_else(|| crate::response::ApiError::not_found(format!("Component '{component_id}' not found")))?;
-
-    let data_service = component
-        .data_service()
-        .ok_or_else(|| crate::response::ApiError::not_found("Data service not available for this component"))?;
+    let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(component_id)?;
 
     let query = query.unwrap_or_else(|_| web::Query(DataGroupQuery::default()));
     let include_schema = query.include_schema;

@@ -3,8 +3,6 @@
 
 use derive_more::Display;
 
-use crate::data::DataService;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
 pub enum EntityType {
     Component,
@@ -40,11 +38,6 @@ pub trait Entity: Send + Sync {
     fn translation_id(&self) -> Option<&str> {
         None
     }
-
-    /// Get the DataService for this entity, if available
-    fn data_service(&self) -> Option<&dyn DataService> {
-        None
-    }
 }
 
 /// Special entity representing the SOVD server root
@@ -73,11 +66,6 @@ impl Entity for SovdServer {
     }
 
     fn translation_id(&self) -> Option<&str> {
-        None
-    }
-
-    // No data services at root level per ISO 17978-3
-    fn data_service(&self) -> Option<&dyn DataService> {
         None
     }
 }
