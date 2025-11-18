@@ -6,78 +6,32 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use sovd_diagnostic::{
-    Entity, EntityId,
+    Entity,
     data::{DataCategory, DataCategoryInformation, DataError, DataService, DataValue, ValueGroup, ValueMetaData},
 };
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 #[derive(Clone, Debug)]
-struct DataEntry {
-    metadata: ValueMetaData,
-    value: serde_json::Value,
-    writable: bool,
+pub struct DataEntry {
+    pub metadata: ValueMetaData,
+    pub value: serde_json::Value,
+    pub writable: bool,
 }
 
-/// A static component with data from configuration
-#[derive(Clone, derive_more::Debug)]
-pub struct StaticComponent {
+pub struct MockComponent {
     pub id: String,
     pub name: String,
     pub tags: Vec<String>,
-
-    // Component-specific config passed from TOML
-    #[debug(skip)]
-    #[allow(dead_code)] // Used for get_config_* methods
-    pub config: Option<toml::Value>,
-
-    // Static data storage
-    #[debug(skip)]
-    data: Arc<RwLock<HashMap<String, DataEntry>>>,
 }
 
-impl StaticComponent {
-    pub fn new(id: String, name: String, tags: Vec<String>, config: Option<toml::Value>) -> Self {
-        Self {
-            id,
-            name,
-            tags,
-            config,
-            data: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    /// Add a data item (convenience method for config loading)
-    pub fn add_data_item(&mut self, metadata: ValueMetaData, value: serde_json::Value, writable: bool) {
-        // During initialization, we have exclusive access via &mut self
-        // So we can use Arc::get_mut to get direct access without locking
-        if let Some(data) = Arc::get_mut(&mut self.data) {
-            debug!(
-                component_id = %self.id,
-                data_id = %metadata.id,
-                data_name = %metadata.name,
-                category = ?metadata.category,
-                groups = ?metadata.groups,
-                "Add data item to component"
-            );
-            data.get_mut().insert(
-                metadata.id.clone(),
-                DataEntry {
-                    metadata,
-                    value,
-                    writable,
-                },
-            );
-            debug!(component_id = %self.id, count = data.get_mut().len(), "Component data items updated");
-        } else {
-            // This shouldn't happen during initialization, but handle it gracefully
-            panic!("Cannot add data item: Arc is shared during initialization");
-        }
+impl MockComponent {
+    pub fn new(id: String, name: String, tags: Vec<String>) -> Self {
+        Self { id, name, tags }
     }
 }
 
-/// Implement Entity trait for `StaticComponent`
-impl Entity for StaticComponent {
+impl Entity for MockComponent {
     fn id(&self) -> &str {
         &self.id
     }
@@ -93,67 +47,49 @@ impl Entity for StaticComponent {
     fn translation_id(&self) -> Option<&str> {
         None
     }
+}
 
-    fn data_service(&self) -> Option<&dyn DataService> {
-        Some(self)
+pub struct MockDataService {
+    data: Arc<RwLock<HashMap<String, DataEntry>>>,
+}
+
+impl MockDataService {
+    pub fn new(data: HashMap<String, DataEntry>) -> Self {
+        Self {
+            data: Arc::new(RwLock::new(data)),
+        }
     }
 }
 
-/// `StaticComponent` implements `DataService` directly
 #[async_trait]
-impl DataService for StaticComponent {
+impl DataService for MockDataService {
     async fn list(
         &self,
-        entity: &EntityId,
+        entity_id: &str,
         categories: Vec<DataCategory>,
         groups: Vec<String>,
     ) -> Result<Vec<ValueMetaData>, DataError> {
-        debug!(
-            entity_id = %entity.id,
-            component_id = %self.id,
-            categories = ?categories,
-            groups = ?groups,
-            "DataService list called"
-        );
-
-        // Only respond to requests for this component
-        if entity.id != self.id {
-            debug!(entity_id = %entity.id, component_id = %self.id, "Entity ID mismatch");
-            return Ok(Vec::new());
-        }
-
+        trace!(entity_id = %entity_id, categories = ?categories, groups = ?groups, "List data items");
         let data = self.data.read().await;
-        debug!(component_id = %self.id, total_count = data.len(), "Component data items loaded");
 
-        let items: Vec<ValueMetaData> = data
+        let filtered: Vec<ValueMetaData> = data
             .values()
             .filter(|entry| {
-                let cat_match = categories.is_empty() || categories.contains(&entry.metadata.category);
+                let category_match = categories.is_empty() || categories.contains(&entry.metadata.category);
                 let group_match = groups.is_empty() || entry.metadata.groups.iter().any(|g| groups.contains(g));
-                let matches = cat_match && group_match;
-                trace!(
-                    data_id = %entry.metadata.id,
-                    cat_match,
-                    group_match,
-                    matches,
-                    "Filter data item"
-                );
-                matches
+                category_match && group_match
             })
             .map(|entry| entry.metadata.clone())
             .collect();
-        drop(data);
 
-        debug!(component_id = %self.id, filtered_count = items.len(), "Return filtered items");
-        Ok(items)
+        trace!(entity_id = %entity_id, count = filtered.len(), "Filtered data items");
+        Ok(filtered)
     }
 
-    async fn read(&self, entity: &EntityId, data_id: &str) -> Result<DataValue, DataError> {
-        if entity.id != self.id {
-            return Err(DataError::not_found("Wrong component"));
-        }
-
+    async fn read(&self, entity_id: &str, data_id: &str) -> Result<DataValue, DataError> {
+        trace!(entity_id = %entity_id, data_id = %data_id, "Read data value");
         let data = self.data.read().await;
+
         data.get(data_id)
             .map(|entry| DataValue {
                 id: data_id.to_string(),
@@ -163,12 +99,10 @@ impl DataService for StaticComponent {
             .ok_or_else(|| DataError::not_found(data_id))
     }
 
-    async fn write(&self, entity: &EntityId, data_id: &str, value: serde_json::Value) -> Result<(), DataError> {
-        if entity.id != self.id {
-            return Err(DataError::not_found("Wrong component"));
-        }
-
+    async fn write(&self, entity_id: &str, data_id: &str, value: serde_json::Value) -> Result<(), DataError> {
+        debug!(entity_id = %entity_id, data_id = %data_id, "Write data value");
         let mut data = self.data.write().await;
+
         match data.get_mut(data_id) {
             Some(entry) if entry.writable => {
                 entry.value = value;
@@ -179,12 +113,10 @@ impl DataService for StaticComponent {
         }
     }
 
-    async fn list_categories(&self, entity: &EntityId) -> Result<Vec<DataCategoryInformation>, DataError> {
-        if entity.id != self.id {
-            return Ok(Vec::new());
-        }
-
+    async fn list_categories(&self, entity_id: &str) -> Result<Vec<DataCategoryInformation>, DataError> {
+        trace!(entity_id = %entity_id, "List categories");
         let data = self.data.read().await;
+
         let mut categories = std::collections::HashSet::new();
 
         for entry in data.values() {
@@ -201,16 +133,10 @@ impl DataService for StaticComponent {
             .collect())
     }
 
-    async fn list_groups(
-        &self,
-        entity: &EntityId,
-        category: Option<DataCategory>,
-    ) -> Result<Vec<ValueGroup>, DataError> {
-        if entity.id != self.id {
-            return Ok(Vec::new());
-        }
-
+    async fn list_groups(&self, entity_id: &str, category: Option<DataCategory>) -> Result<Vec<ValueGroup>, DataError> {
+        trace!(entity_id = %entity_id, category = ?category, "List groups");
         let data = self.data.read().await;
+
         let mut groups = std::collections::HashSet::new();
 
         for entry in data.values() {

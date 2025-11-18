@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 
-use crate::entities::{Entity, EntityId};
+use crate::entities::Entity;
 
 pub struct EntityRepository {
     entities: DashMap<String, Arc<dyn Entity>>,
@@ -22,16 +22,12 @@ impl EntityRepository {
         self.entities.insert(entity.id().to_string(), entity);
     }
 
-    pub fn entity_exists(&self, entity_id: &EntityId) -> bool {
-        self.entities.contains_key(&entity_id.id)
+    pub fn entity_exists(&self, entity_id: &str) -> bool {
+        self.entities.contains_key(entity_id)
     }
 
     pub fn get_entity(&self, id: &str) -> Option<Arc<dyn Entity>> {
         self.entities.get(id).map(|r| r.value().clone())
-    }
-
-    pub fn get_entity_by_id(&self, entity_id: &EntityId) -> Option<Arc<dyn Entity>> {
-        self.entities.get(&entity_id.id).map(|r| r.value().clone())
     }
 
     pub fn list_entities(&self) -> Vec<Arc<dyn Entity>> {
