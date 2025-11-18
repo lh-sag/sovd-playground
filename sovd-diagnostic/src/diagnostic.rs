@@ -66,7 +66,7 @@ impl ServiceRegistry {
         self.services
             .get(&(entity_id.to_string(), type_id))
             .and_then(|s| s.clone().downcast::<Arc<T>>().ok())
-            .map(|arc_arc| (*arc_arc).clone())
+            .map(|arc| Arc::unwrap_or_clone(arc))
             .ok_or_else(|| ServiceError::ServiceNotFound {
                 entity_id: entity_id.to_string(),
                 service_type: std::any::type_name::<T>().to_string(),
