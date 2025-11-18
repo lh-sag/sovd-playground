@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ' ', '(', env!("COMMIT_SHA"), ')');
+pub const VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    ' ',
+    '(',
+    env!("COMMIT_SHA"),
+    ' ',
+    env!("BUILD_DATE"),
+    ')'
+);
 
 pub const ENABLED_FEATURES: &[&str] = &[
     #[cfg(feature = "ui")]

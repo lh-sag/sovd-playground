@@ -80,3 +80,6 @@ hyper-util = { workspace = true, features = ["client", "client-legacy", "http1",
 http-body-util = { workspace = true }
 hyper-openssl = { workspace = true, optional = true }
 awc = { workspace = true }
+
+[build-dependencies]
+time = { version = "0.3", default-features = false, features = ["macros", "formatting", "parsing"] }

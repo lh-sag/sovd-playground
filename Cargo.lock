@@ -1686,6 +1686,7 @@ dependencies = [
  "sovd-diagnostic",
  "sovd-models",
  "sovd-server",
+ "time",
  "tokio",
  "toml",
  "tracing",
