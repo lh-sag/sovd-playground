@@ -7,19 +7,15 @@ use std::process::Command;
 use time::OffsetDateTime;
 
 fn main() {
-    // Set COMMIT_SHA from GITHUB_SHA or git describe
-    println!("cargo:rerun-if-env-changed=GITHUB_SHA");
-    let commit_sha = std::env::var("GITHUB_SHA").ok().or_else(|| {
-        println!("cargo:rerun-if-changed=../.git/logs/HEAD");
-        Command::new("git")
-            .args(["describe", "--dirty", "--always"])
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-    });
-
-    if let Some(sha) = commit_sha {
+    // Set COMMIT_SHA from git describe
+    println!("cargo:rerun-if-changed=../.git/logs/HEAD");
+    if let Some(sha) = Command::new("git")
+        .args(["describe", "--dirty", "--always"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    {
         println!("cargo:rustc-env=COMMIT_SHA={sha}");
     }
 
