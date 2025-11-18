@@ -23,8 +23,7 @@ docker run --rm -p 9000:9000 ghcr.io/lh-sag/sovd-gateway:latest
 # Query version info
 curl --silent --show-error http://127.0.0.1:9000/sovd/v1/version-info | jq
 
-# Open SOVD Dashboard in your browser
-# http://127.0.0.1:9000/ui
+# Open SOVD Dashboard in your browser: http://127.0.0.1:9000/ui
 ```
 
 ## Development
@@ -37,6 +36,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Install dependencies
 uv sync
+
 
 # Install pre-commit hooks
 uv run pre-commit install
@@ -112,7 +112,11 @@ cargo test --workspace --all-targets --all-features
 uv run pytest
 ```
 
-See [tests/README.md](tests/README.md) for more information.
+See [tests/README.md](tests/README.md) for more information.]]
+
+## Architecture
+
+See [doc/architecture.md](doc/architecture.md) for system architecture and component diagrams.
 
 ## CI/CD
 
@@ -128,7 +132,7 @@ See [.github/WORKFLOWS.md](.github/WORKFLOWS.md) for workflow architecture and d
 
 | Crate | Purpose |
 |-------|---------|
-| [`sovd-models`](sovd-models/README.md) | SOVD data structures and schemas |
+| [`sovd-models`](sovd-models/README.md) | SOVD data structures |
 | [`sovd-server`](sovd-server/README.md) | RESTful API |
 | [`sovd-diagnostic`](sovd-diagnostic/README.md) | Entity management and diagnostics |
 | [`sovd-cli`](sovd-cli/README.md) | Gateway server executable |
