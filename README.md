@@ -5,7 +5,7 @@
 
 <div align="center">
 
-[![CI](https://github.com/lh-sag/sovd-playground/workflows/CI/badge.svg)](https://github.com/lh-sag/sovd-playground/actions/workflows/ci.yaml?query=branch%3Amain++)
+[![CI](https://github.com/lh-sag/sovd-playground/workflows/CI/badge.svg?branch=main)](https://github.com/lh-sag/sovd-playground/actions/workflows/ci.yaml?query=branch%3Amain)
 [![Coverage](https://lh-sag.github.io/sovd-playground/coverage-badge.svg)](https://lh-sag.github.io/sovd-playground/html/index.html)
 [![slack](https://img.shields.io/badge/chat-slack-blue.svg?logo=slack)](https://app.slack.com/client/T02MS1M89UH/C0958MQNGP2)
 
