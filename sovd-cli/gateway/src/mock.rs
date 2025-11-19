@@ -10,9 +10,9 @@ use sovd_diagnostic::{DataCategory, DiagnosticBuilder, ValueMetaData};
 use crate::components::{DataEntry, MockComponent, MockDataService};
 
 pub fn create_mock_components(builder: DiagnosticBuilder) -> DiagnosticBuilder {
-    let engine = Arc::new(create_engine_component());
-    let transmission = Arc::new(create_transmission_component());
-    let hydraulics = Arc::new(create_hydraulics_component());
+    let engine = create_engine_component();
+    let transmission = create_transmission_component();
+    let hydraulics = create_hydraulics_component();
 
     let engine_data = Arc::new(create_engine_data_service());
     let transmission_data = Arc::new(create_transmission_data_service());
