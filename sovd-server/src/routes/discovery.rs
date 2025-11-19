@@ -3,7 +3,7 @@
 //
 
 use actix_web::{HttpRequest, HttpResponse, web};
-use sovd_diagnostic::Diagnostic;
+use sovd_diagnostic::{DataService, Diagnostic};
 use sovd_models::{
     IncludeSchemaQuery,
     entity::{
@@ -100,9 +100,10 @@ async fn list_capabilities(
         component_id
     );
 
-    // Populate all resource collections
     let resources = sovd_models::entity::Resources {
-        data: Some(format!("{base}/data")),
+        data: diagnostic
+            .has_service::<dyn DataService>(component_id)
+            .then(|| format!("{base}/data")),
         ..Default::default()
     };
 

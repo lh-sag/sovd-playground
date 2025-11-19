@@ -187,6 +187,13 @@ impl Diagnostic {
 
         self.services.get::<T>(entity_id)
     }
+
+    pub fn has_service<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str) -> bool
+    where
+        Arc<T>: Any + Send + Sync,
+    {
+        self.services.get::<T>(entity_id).is_ok()
+    }
 }
 
 impl Clone for Diagnostic {

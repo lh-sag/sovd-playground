@@ -76,7 +76,7 @@ cargo run --bin sovd-gateway -- --config sovd-cli/gateway/config.toml
 
 See `sovd-gateway --help` for all options.
 
-### CURL Examples
+### Client Examples (CURL)
 
 ```bash
 # Get version information

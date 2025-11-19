@@ -17,10 +17,14 @@ authors = { workspace = true }
 name = "simple-server"
 path = "server/simple.rs"
 
+[[example]]
+name = "dynamic-server"
+path = "server/dynamic.rs"
+
 [dependencies]
 sovd-diagnostic = { workspace = true }
 sovd-server = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 async-trait = { workspace = true }
