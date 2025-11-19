@@ -131,7 +131,7 @@ See [.github/WORKFLOWS.md](.github/WORKFLOWS.md) for workflow architecture and d
 ## Project Structure
 
 | Crate | Purpose |
-|-------|---------|
+| ------- | --------- |
 | [`sovd-models`](sovd-models/README.md) | SOVD data structures |
 | [`sovd-server`](sovd-server/README.md) | RESTful API |
 | [`sovd-diagnostic`](sovd-diagnostic/README.md) | Entity management and diagnostics |
