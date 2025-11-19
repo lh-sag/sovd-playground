@@ -33,7 +33,7 @@ pub enum ServiceError {
 }
 
 pub struct ServiceRegistry {
-    services: DashMap<(String, TypeId), Arc<dyn Any + Send + Sync>>,
+    services: DashMap<(String, TypeId), Box<dyn Any + Send + Sync>>,
 }
 
 impl Default for ServiceRegistry {
@@ -55,7 +55,7 @@ impl ServiceRegistry {
     {
         let type_id = TypeId::of::<Arc<T>>();
         self.services
-            .insert((entity_id.to_string(), type_id), Arc::new(service));
+            .insert((entity_id.to_string(), type_id), Box::new(service));
     }
 
     pub fn get<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str) -> Result<Arc<T>, ServiceError>
@@ -65,8 +65,7 @@ impl ServiceRegistry {
         let type_id = TypeId::of::<Arc<T>>();
         self.services
             .get(&(entity_id.to_string(), type_id))
-            .and_then(|s| s.clone().downcast::<Arc<T>>().ok())
-            .map(|arc_arc| (*arc_arc).clone())
+            .and_then(|s| s.downcast_ref::<Arc<T>>().map(Arc::clone))
             .ok_or_else(|| ServiceError::ServiceNotFound {
                 entity_id: entity_id.to_string(),
                 service_type: std::any::type_name::<T>().to_string(),
@@ -75,7 +74,7 @@ impl ServiceRegistry {
 }
 
 pub struct EntityContext {
-    services: Vec<(TypeId, Arc<dyn Any + Send + Sync>)>,
+    services: Vec<(TypeId, Box<dyn Any + Send + Sync>)>,
 }
 
 impl Default for EntityContext {
@@ -93,8 +92,7 @@ impl EntityContext {
     where
         Arc<T>: Any + Send + Sync,
     {
-        self.services
-            .push((TypeId::of::<Arc<T>>(), Arc::new(service) as Arc<dyn Any + Send + Sync>));
+        self.services.push((TypeId::of::<Arc<T>>(), Box::new(service)));
         self
     }
 }
@@ -116,18 +114,18 @@ impl DiagnosticBuilder {
         }
     }
 
-    pub fn add_entity(self, entity: Arc<dyn Entity>) -> Self {
-        self.repository.add_entity(entity);
+    pub fn add_entity(self, entity: impl Entity + 'static) -> Self {
+        self.repository.add_entity(Arc::new(entity));
         self
     }
 
-    pub fn with_entity<T, F>(self, entity: Arc<T>, configure: F) -> Self
+    pub fn with_entity<T, F>(self, entity: T, configure: F) -> Self
     where
         T: Entity + 'static,
         F: FnOnce(EntityContext) -> EntityContext,
     {
         let entity_id = entity.id().to_string();
-        self.repository.add_entity(entity as Arc<dyn Entity>);
+        self.repository.add_entity(Arc::new(entity));
 
         let ctx = EntityContext::new();
         let ctx = configure(ctx);
@@ -150,16 +148,19 @@ impl Default for DiagnosticBuilder {
     }
 }
 
+struct DiagnosticInner {
+    entities: EntityRepository,
+    services: ServiceRegistry,
+}
+
 pub struct Diagnostic {
-    pub entities: Arc<EntityRepository>,
-    services: Arc<ServiceRegistry>,
+    inner: Arc<DiagnosticInner>,
 }
 
 impl Diagnostic {
     pub fn new(entities: EntityRepository, services: ServiceRegistry) -> Self {
         Self {
-            entities: Arc::new(entities),
-            services: Arc::new(services),
+            inner: Arc::new(DiagnosticInner { entities, services }),
         }
     }
 
@@ -172,35 +173,36 @@ impl Diagnostic {
     }
 
     pub fn entities(&self) -> &EntityRepository {
-        &self.entities
+        &self.inner.entities
+    }
+
+    pub fn get_entity(&self, id: &str) -> Option<Arc<dyn Entity>> {
+        self.inner.entities.get_entity(id)
+    }
+
+    pub fn list_entities(&self) -> Vec<Arc<dyn Entity>> {
+        self.inner.entities.list_entities()
     }
 
     pub fn get_service<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str) -> Result<Arc<T>, ServiceError>
     where
         Arc<T>: Any + Send + Sync,
     {
-        self.entities
-            .get_entity(entity_id)
-            .ok_or_else(|| ServiceError::EntityNotFound {
-                entity_id: entity_id.to_string(),
-            })?;
-
-        self.services.get::<T>(entity_id)
+        self.inner.services.get::<T>(entity_id)
     }
 
     pub fn has_service<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str) -> bool
     where
         Arc<T>: Any + Send + Sync,
     {
-        self.services.get::<T>(entity_id).is_ok()
+        self.inner.services.get::<T>(entity_id).is_ok()
     }
 }
 
 impl Clone for Diagnostic {
     fn clone(&self) -> Self {
         Self {
-            entities: Arc::clone(&self.entities),
-            services: Arc::clone(&self.services),
+            inner: Arc::clone(&self.inner),
         }
     }
 }

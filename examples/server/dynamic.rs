@@ -4,6 +4,7 @@
 use std::net::TcpListener;
 use std::sync::Arc;
 
+use examples::Ecu;
 use sovd_diagnostic::DiagnosticBuilder;
 use sovd_server::{Server, ServerConfig};
 use tokio::time::{Duration, interval};
@@ -13,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     examples::init_logging();
 
     let diagnostic = DiagnosticBuilder::new().build()?;
-    let entities = Arc::clone(&diagnostic.entities);
+    let diagnostic_clone = diagnostic.clone();
 
     tokio::spawn(async move {
         let mut ticker = interval(Duration::from_secs(4));
@@ -22,9 +23,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             ticker.tick().await;
             let ecu_id = format!("ecu{counter}");
-            let ecu = Arc::new(Ecu::new(ecu_id.clone()));
-            entities.add_entity(ecu);
-            tracing::info!("Added {ecu_id}");
+            let ecu_name = format!("ECU {counter}");
+            let ecu = Ecu::new(ecu_id, ecu_name);
+            diagnostic_clone.entities().add_entity(Arc::new(ecu));
+            tracing::info!("Added ecu{counter}");
             counter += 1;
         }
     });
@@ -39,32 +41,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Server::new(config).start().await?;
     Ok(())
-}
-
-struct Ecu {
-    id: String,
-}
-
-impl Ecu {
-    fn new(id: String) -> Self {
-        Self { id }
-    }
-}
-
-impl sovd_diagnostic::Entity for Ecu {
-    fn id(&self) -> &str {
-        &self.id
-    }
-
-    fn name(&self) -> &str {
-        "ECU"
-    }
-
-    fn tags(&self) -> &[String] {
-        &[]
-    }
-
-    fn translation_id(&self) -> Option<&str> {
-        None
-    }
 }
