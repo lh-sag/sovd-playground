@@ -19,16 +19,25 @@ pub fn init_logging() {
         .init();
 }
 
-/// Simple engine component
-pub struct Engine;
+/// ECU component
+pub struct Ecu {
+    id: String,
+    name: String,
+}
 
-impl Entity for Engine {
+impl Ecu {
+    pub fn new(id: String, name: String) -> Self {
+        Self { id, name }
+    }
+}
+
+impl Entity for Ecu {
     fn id(&self) -> &str {
-        "engine"
+        &self.id
     }
 
     fn name(&self) -> &str {
-        "Engine Control Unit"
+        &self.name
     }
 
     fn tags(&self) -> &[String] {
