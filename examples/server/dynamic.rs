@@ -1,5 +1,9 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
+//
+// Dynamic entity addition example - adds new ECU entities every 4 seconds
+//
+// Run with: cargo run --example dynamic-server
 
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -31,6 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // Start SOVD server on http://127.0.0.1:9000/sovd
     let listener = TcpListener::bind("127.0.0.1:9000")?;
     tracing::info!("Starting SOVD server on http://127.0.0.1:9000/sovd");
 

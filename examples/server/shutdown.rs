@@ -1,5 +1,9 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
+//
+// Server shutdown example with signal handling (timeout, Ctrl+C, SIGTERM)
+//
+// Run with: cargo run --example shutdown-server
 
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -19,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .build()?;
 
+    // Start SOVD server on http://127.0.0.1:9000/sovd
     let listener = TcpListener::bind("127.0.0.1:9000")?;
     tracing::info!("Starting SOVD server on http://127.0.0.1:9000/sovd");
 

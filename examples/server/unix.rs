@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
 //
+// Unix domain socket server example (abstract and file-based)
+//
+// Run with: cargo run --example unix-server
+//
 // Abstract unix socket: curl --silent --show-error --abstract-unix-socket sovd http://localhost/local1/version-info | jq
 // Unix socket: curl --silent --show-error --unix-socket /tmp/sovd.sock http://localhost/local2/version-info | jq
 
@@ -24,6 +28,7 @@ mod unix {
             )
             .build()?;
 
+        // Start SOVD server on Unix domain sockets
         let socket_path = "/tmp/sovd.sock";
         let _ = std::fs::remove_file(socket_path);
         let file_listener = UnixListener::bind(socket_path)?;
@@ -52,7 +57,8 @@ mod unix {
             );
         }
 
-        Server::new(config.build()?).start().await?;
+        let config = config.build()?;
+        Server::new(config).start().await?;
         Ok(())
     }
 }
