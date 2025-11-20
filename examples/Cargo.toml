@@ -25,6 +25,10 @@ path = "server/dynamic.rs"
 name = "shutdown-server"
 path = "server/shutdown.rs"
 
+[[example]]
+name = "unix-server"
+path = "server/unix.rs"
+
 [dependencies]
 sovd-diagnostic = { workspace = true }
 sovd-server = { workspace = true }
