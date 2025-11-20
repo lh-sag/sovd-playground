@@ -7,7 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use sovd_diagnostic::{
     Entity,
-    data::{DataCategory, DataCategoryInformation, DataError, DataService, DataValue, ValueGroup, ValueMetaData},
+    data::{DataCategory, DataCategoryInformation, DataError, DataService, ReadValue, ValueGroup, ValueMetaData},
 };
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
@@ -86,14 +86,14 @@ impl DataService for MockDataService {
         Ok(filtered)
     }
 
-    async fn read(&self, entity_id: &str, data_id: &str) -> Result<DataValue, DataError> {
+    async fn read(&self, entity_id: &str, data_id: &str) -> Result<ReadValue, DataError> {
         trace!(entity_id = %entity_id, data_id = %data_id, "Read data value");
         let data = self.data.read().await;
 
         data.get(data_id)
-            .map(|entry| DataValue {
+            .map(|entry| ReadValue {
                 id: data_id.to_string(),
-                value: entry.value.clone(),
+                data: entry.value.clone(),
                 errors: vec![],
             })
             .ok_or_else(|| DataError::not_found(data_id))
