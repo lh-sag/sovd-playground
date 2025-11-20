@@ -8,6 +8,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
+use futures_util::FutureExt;
 #[cfg(feature = "openssl")]
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 use serde::{Deserialize, Serialize};
@@ -88,6 +89,42 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let builder = sovd_diagnostic::DiagnosticBuilder::new();
     let builder = mock::create_mock_components(builder);
     let diagnostic = builder.build()?;
+
+    // Create shared shutdown signal
+    let shutdown_signal = async {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => tracing::info!(target: TARGET, "Shutdown from Ctrl+C"),
+            () = sigterm() => tracing::info!(target: TARGET, "Shutdown from SIGTERM"),
+        }
+    }
+    .shared();
+
+    // Subscribe to entity events
+    let mut entity_events = diagnostic.entities().subscribe();
+    let shutdown_clone = shutdown_signal.clone();
+    tokio::spawn(async move {
+        let mut shutdown = shutdown_clone;
+        loop {
+            tokio::select! {
+                event = entity_events.recv() => {
+                    match event {
+                        Ok(sovd_diagnostic::EntityEvent::Added { entity_id, entity }) => {
+                            tracing::info!(target: TARGET, entity_id = %entity_id, entity_name = %entity.name(), "Entity added");
+                        }
+                        Ok(sovd_diagnostic::EntityEvent::Removed { entity_id, entity }) => {
+                            tracing::info!(target: TARGET, entity_id = %entity_id, entity_name = %entity.name(), "Entity removed");
+                        }
+                        Err(_) => break,
+                    }
+                }
+                () = &mut shutdown => {
+                    tracing::info!(target: TARGET, "Entity event subscriber shutting down");
+                    break;
+                }
+            }
+        }
+    });
+
     let mut servers = Vec::new();
 
     // Load config servers if config is provided
@@ -189,7 +226,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!(target: TARGET, version = %cli::VERSION, features = ?ENABLED_FEATURES, "Start SOVD server");
 
-    let config = config_builder.build()?;
+    let config = config_builder.shutdown(shutdown_signal).build()?;
     Server::<OpenSovdInfo>::new(config).start().await?;
     Ok(())
 }
@@ -245,4 +282,17 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+#[cfg(unix)]
+async fn sigterm() {
+    tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("Failed to install SIGTERM handler")
+        .recv()
+        .await;
+}
+
+#[cfg(not(unix))]
+async fn sigterm() {
+    std::future::pending::<()>().await;
 }

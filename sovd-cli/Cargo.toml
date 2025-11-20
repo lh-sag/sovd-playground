@@ -73,7 +73,7 @@ log = { workspace = true }
 dashmap = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
-futures-util = { workspace = true }
+futures-util = { workspace = true, features = ["std"] }
 uuid = { workspace = true }
 hyper = { workspace = true, features = ["client", "http1", "http2"] }
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
