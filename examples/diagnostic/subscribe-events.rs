@@ -1,5 +1,9 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
+//
+// Entity event subscription example - demonstrates add/remove event notifications
+//
+// Run with: cargo run --example subscribe-events
 
 use std::sync::Arc;
 
