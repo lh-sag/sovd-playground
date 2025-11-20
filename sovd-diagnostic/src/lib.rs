@@ -9,4 +9,4 @@ pub mod repository;
 pub use data::{DataCategory, DataError, DataService, DataValue, ValueMetaData};
 pub use diagnostic::{BuilderError, Diagnostic, DiagnosticBuilder, ServiceError};
 pub use entities::Entity;
-pub use repository::EntityRepository;
+pub use repository::{EntityEvent, EntityRepository};

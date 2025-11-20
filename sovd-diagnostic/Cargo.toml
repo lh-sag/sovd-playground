@@ -26,3 +26,6 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 dashmap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros"] }
