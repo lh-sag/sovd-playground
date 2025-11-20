@@ -29,6 +29,10 @@ path = "server/shutdown.rs"
 name = "unix-server"
 path = "server/unix.rs"
 
+[[example]]
+name = "subscribe-events"
+path = "diagnostic/subscribe-events.rs"
+
 [dependencies]
 sovd-diagnostic = { workspace = true }
 sovd-server = { workspace = true }
