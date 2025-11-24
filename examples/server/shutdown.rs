@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
             |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
         )
-        .build()?;
+        .build();
 
     // Start SOVD server on http://127.0.0.1:9000/sovd
     let listener = TcpListener::bind("127.0.0.1:9000")?;

@@ -10,12 +10,6 @@ use crate::entities::{Entity, SovdServer};
 use crate::repository::EntityRepository;
 
 #[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
-pub enum BuilderError {
-    #[display("Entity with id '{}' already exists", _0)]
-    DuplicateEntity(#[error(ignore)] String),
-}
-
-#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
 pub enum ServiceError {
     #[display("Entity '{}' not found", entity_id)]
     EntityNotFound {
@@ -137,8 +131,8 @@ impl DiagnosticBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Diagnostic, BuilderError> {
-        Ok(Diagnostic::new(self.repository, self.services))
+    pub fn build(self) -> Diagnostic {
+        Diagnostic::new(self.repository, self.services)
     }
 }
 

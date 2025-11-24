@@ -17,7 +17,7 @@ use tokio::time::{Duration, interval};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     examples::init_logging();
 
-    let diagnostic = DiagnosticBuilder::new().build()?;
+    let diagnostic = DiagnosticBuilder::new().build();
     let diagnostic_clone = diagnostic.clone();
 
     let mut rx = diagnostic.entities().subscribe();

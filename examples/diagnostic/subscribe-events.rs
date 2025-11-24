@@ -14,7 +14,7 @@ use sovd_diagnostic::{DiagnosticBuilder, EntityEvent};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     examples::init_logging();
 
-    let diagnostic = DiagnosticBuilder::new().build()?;
+    let diagnostic = DiagnosticBuilder::new().build();
 
     let mut rx = diagnostic.entities().subscribe();
 

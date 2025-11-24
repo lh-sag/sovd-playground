@@ -24,7 +24,7 @@ mod systemd {
                 Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
                 |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
             )
-            .build()?;
+            .build();
 
         let fds: Vec<(i32, String)> = sd_notify::listen_fds_with_names(false)?.collect();
         if fds.is_empty() {

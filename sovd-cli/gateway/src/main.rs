@@ -88,7 +88,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // Build diagnostic with mock components
     let builder = sovd_diagnostic::DiagnosticBuilder::new();
     let builder = mock::create_mock_components(builder);
-    let diagnostic = builder.build()?;
+    let diagnostic = builder.build();
 
     // Create shared shutdown signal
     let shutdown_signal = async {

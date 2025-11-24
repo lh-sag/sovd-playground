@@ -26,7 +26,7 @@ mod unix {
                 Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
                 |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
             )
-            .build()?;
+            .build();
 
         // Start SOVD server on Unix domain sockets
         let socket_path = "/tmp/sovd.sock";
