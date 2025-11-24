@@ -6,7 +6,6 @@ use std::future::Future;
 use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::net::UnixListener;
-use std::sync::Arc;
 
 use derive_more::{Debug, Display};
 use futures_core::future::BoxFuture;
@@ -44,7 +43,7 @@ pub struct ServerConfig<T = VendorInfo> {
     /// Vendor information for the server
     pub(crate) vendor_info: Option<T>,
     /// Diagnostic instance for the server
-    pub(crate) diagnostic: Arc<Diagnostic>,
+    pub(crate) diagnostic: Diagnostic,
 }
 
 /// Error types for the ServerConfigBuilder.
@@ -106,7 +105,7 @@ pub struct ServerConfigBuilder<T = VendorInfo> {
     endpoints: Vec<Endpoint>,
     shutdown: Option<BoxFuture<'static, ()>>,
     vendor_info: Option<T>,
-    diagnostic: Arc<Diagnostic>,
+    diagnostic: Diagnostic,
 }
 
 impl<T> ServerConfigBuilder<T> {
@@ -116,7 +115,7 @@ impl<T> ServerConfigBuilder<T> {
             endpoints: Vec::new(),
             shutdown: None,
             vendor_info: None,
-            diagnostic: Arc::new(Diagnostic::empty()),
+            diagnostic: Diagnostic::empty(),
         }
     }
 
@@ -136,7 +135,7 @@ impl<T> ServerConfigBuilder<T> {
     }
 
     /// Set the diagnostic instance for the server.
-    pub fn diagnostic(mut self, diagnostic: Arc<Diagnostic>) -> Self {
+    pub fn diagnostic(mut self, diagnostic: Diagnostic) -> Self {
         self.diagnostic = diagnostic;
         self
     }
@@ -184,7 +183,7 @@ impl Default for ServerConfigBuilder<VendorInfo> {
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 name: "SOVD".to_string(),
             }),
-            diagnostic: Arc::new(Diagnostic::empty()),
+            diagnostic: Diagnostic::empty(),
         }
     }
 }

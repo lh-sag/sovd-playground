@@ -47,11 +47,9 @@ pub(super) async fn list_data_resources(
         .list(component_id, categories, groups)
         .await
         .map_err(crate::response::ApiError::from)?;
-    debug!(component_id = %component_id, count = items.len(), "Data service list returned items");
-    let response = DataResourceResponse { items };
-    debug!(component_id = %component_id, count = response.items.len(), "Return DataResourceResponse");
+    debug!(component_id = %component_id, count = items.len(), "Returning data resources");
 
-    Ok(create_api_response(response, include_schema))
+    Ok(create_api_response(DataResourceResponse { items }, include_schema))
 }
 
 /// Get a specific data value

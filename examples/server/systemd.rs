@@ -33,7 +33,7 @@ mod systemd {
 
         tracing::info!("Starting SOVD server with systemd socket activation");
 
-        let mut config_builder = ServerConfig::builder().diagnostic(Arc::new(diagnostic));
+        let mut config_builder = ServerConfig::builder().diagnostic(diagnostic);
 
         for (i, (fd, name)) in fds.iter().enumerate() {
             let base_path = if name.is_empty() {

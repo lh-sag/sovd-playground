@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use actix_web::{App, HttpServer, guard, web};
 use sovd_models::version::VendorInfo;
 use tracing::info;
@@ -23,7 +21,7 @@ fn configure<T>(
     base: &str,
     server_name: &[String],
     vendor_info: Option<T>,
-    diagnostic: Arc<sovd_diagnostic::Diagnostic>,
+    diagnostic: sovd_diagnostic::Diagnostic,
     auth: Option<BearerAuth>,
 ) where
     T: sovd_models::JsonSchema + Clone + Send + Sync + Default + 'static,
@@ -33,7 +31,7 @@ fn configure<T>(
     let mut scope = web::scope(base)
         .app_data(web::Data::new(routes::BaseUri(base.to_string())))
         .app_data(web::Data::new(vendor_info))
-        .app_data(web::Data::from(diagnostic));
+        .app_data(web::Data::new(diagnostic));
 
     // Add hostname guards if server_name is specified
     if !server_name.is_empty() {
@@ -132,8 +130,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use actix_web::{App, test};
     use sovd_diagnostic::Diagnostic;
 
@@ -208,7 +204,7 @@ mod tests {
                             version: "1.0.0".to_string(),
                             name: "Test".to_string(),
                         }),
-                        Arc::new(Diagnostic::empty()),
+                        Diagnostic::empty(),
                         None,
                     )
                 }),

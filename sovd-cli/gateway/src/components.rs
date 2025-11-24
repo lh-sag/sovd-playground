@@ -122,7 +122,6 @@ impl DataService for MockDataService {
         for entry in data.values() {
             categories.insert(entry.metadata.category.clone());
         }
-        drop(data);
 
         Ok(categories
             .into_iter()
@@ -149,7 +148,6 @@ impl DataService for MockDataService {
                 groups.insert((group.clone(), entry.metadata.category.clone()));
             }
         }
-        drop(data);
 
         Ok(groups
             .into_iter()

@@ -12,7 +12,7 @@ use sovd_models::{
 };
 
 /// Vendor-specific error codes for the SOVD server.
-#[derive(Debug, Display, Clone, PartialEq, Serialize)]
+#[derive(Debug, Display, PartialEq, Serialize)]
 #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
 pub(crate) enum VendorError {
     #[allow(dead_code)] // Used in tests via internal_error()

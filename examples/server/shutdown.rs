@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let config = ServerConfig::builder()
-        .diagnostic(Arc::new(diagnostic))
+        .diagnostic(diagnostic)
         .endpoint(sovd_server::Listener::Tcp(listener), None, vec![], "/sovd".into())
         .shutdown(shutdown)
         .build()?;

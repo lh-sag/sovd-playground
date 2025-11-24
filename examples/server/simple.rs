@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Starting SOVD server on http://127.0.0.1:9000/sovd");
 
     let config = ServerConfig::builder()
-        .diagnostic(Arc::new(diagnostic))
+        .diagnostic(diagnostic)
         .endpoint(sovd_server::Listener::Tcp(listener), None, vec![], "/sovd".into())
         .build()?;
 

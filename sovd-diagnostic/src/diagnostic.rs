@@ -26,21 +26,14 @@ pub enum ServiceError {
     },
 }
 
+#[derive(Default)]
 pub struct ServiceRegistry {
     services: DashMap<(String, TypeId), Box<dyn Any + Send + Sync>>,
 }
 
-impl Default for ServiceRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ServiceRegistry {
     pub fn new() -> Self {
-        Self {
-            services: DashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn register<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str, service: Arc<T>)
@@ -67,19 +60,14 @@ impl ServiceRegistry {
     }
 }
 
+#[derive(Default)]
 pub struct EntityContext {
     services: Vec<(TypeId, Box<dyn Any + Send + Sync>)>,
 }
 
-impl Default for EntityContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl EntityContext {
     pub fn new() -> Self {
-        Self { services: Vec::new() }
+        Self::default()
     }
 
     pub fn with_service<T: Send + Sync + 'static + ?Sized>(mut self, service: Arc<T>) -> Self
