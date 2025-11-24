@@ -135,6 +135,7 @@ struct DiagnosticInner {
     services: ServiceRegistry,
 }
 
+#[derive(Clone)]
 pub struct Diagnostic {
     inner: Arc<DiagnosticInner>,
 }
@@ -178,13 +179,5 @@ impl Diagnostic {
         Arc<T>: Any + Send + Sync,
     {
         self.inner.services.get::<T>(entity_id).is_ok()
-    }
-}
-
-impl Clone for Diagnostic {
-    fn clone(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
     }
 }
