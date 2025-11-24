@@ -5,7 +5,7 @@ use actix_web::{HttpResponse, web};
 use sovd_diagnostic::Diagnostic;
 use sovd_models::entity::DataWriteRequest;
 use sovd_models::{
-    IncludeSchemaQuery,
+    ApiResponse, IncludeSchemaQuery,
     data::{DataGroupQuery, DataResourceQuery, DataResourceResponse},
 };
 use tracing::debug;
@@ -66,13 +66,28 @@ pub(super) async fn get_data_value(
     let data_service = diagnostic.get_service::<dyn sovd_diagnostic::DataService>(&component_id)?;
 
     let query = query.unwrap_or_else(|_| web::Query(DataResourceQuery::default()));
-    let include_schema = query.include_schema;
-    let response = data_service
-        .read(&component_id, &data_id)
-        .await
-        .map_err(crate::response::ApiError::from)?;
 
-    Ok(create_api_response(response, include_schema))
+    if query.include_schema {
+        let data_with_schema = data_service
+            .read_with_schema(&component_id, &data_id)
+            .await
+            .map_err(crate::response::ApiError::from)?;
+        let response = ApiResponse {
+            data: data_with_schema.data,
+            schema: data_with_schema.schema,
+        };
+        Ok(HttpResponse::Ok().json(response))
+    } else {
+        let value = data_service
+            .read(&component_id, &data_id)
+            .await
+            .map_err(crate::response::ApiError::from)?;
+        let response = ApiResponse {
+            data: value,
+            schema: None,
+        };
+        Ok(HttpResponse::Ok().json(response))
+    }
 }
 
 /// Set a specific data value

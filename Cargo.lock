@@ -1732,6 +1732,7 @@ dependencies = [
  "derive_more 2.0.1",
  "futures-core",
  "futures-util",
+ "schemars",
  "serde",
  "serde_json",
  "sovd-models",

@@ -10,6 +10,7 @@ version = { workspace = true }
 
 [features]
 default = []
+jsonschema-schemars = ["dep:schemars"]
 
 [dependencies]
 sovd-models = { workspace = true }
@@ -26,6 +27,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 dashmap = { workspace = true }
+schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros"] }
