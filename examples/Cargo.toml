@@ -33,6 +33,10 @@ path = "server/unix.rs"
 name = "subscribe-events"
 path = "diagnostic/subscribe-events.rs"
 
+[[example]]
+name = "systemd-server"
+path = "server/systemd.rs"
+
 [dependencies]
 sovd-diagnostic = { workspace = true }
 sovd-server = { workspace = true }
@@ -41,3 +45,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 async-trait = { workspace = true }
 serde_json = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sd-notify = { version = "0.4", default-features = false }
