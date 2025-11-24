@@ -9,7 +9,7 @@ use std::net::TcpListener;
 use std::sync::Arc;
 
 use examples::Ecu;
-use sovd_diagnostic::DiagnosticBuilder;
+use sovd_diagnostic::{DiagnosticBuilder, EntityEvent};
 use sovd_server::{Server, ServerConfig};
 use tokio::time::{Duration, interval};
 
@@ -19,6 +19,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let diagnostic = DiagnosticBuilder::new().build()?;
     let diagnostic_clone = diagnostic.clone();
+
+    let mut rx = diagnostic.entities().subscribe();
+    tokio::spawn(async move {
+        while let Ok(event) = rx.recv().await {
+            match event {
+                EntityEvent::Added { entity_id, entity } => {
+                    tracing::info!(entity_id = ?entity_id, entity_name = ?entity.name(), "Entity added");
+                }
+                EntityEvent::Removed { entity_id, entity } => {
+                    tracing::info!(entity_id = ?entity_id, entity_name = ?entity.name(), "Entity removed");
+                }
+            }
+        }
+    });
 
     tokio::spawn(async move {
         let mut ticker = interval(Duration::from_secs(4));
@@ -30,7 +44,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let ecu_name = format!("ECU {counter}");
             let ecu = Ecu::new(ecu_id, ecu_name);
             diagnostic_clone.entities().add_entity(Arc::new(ecu));
-            tracing::info!("Added ecu{counter}");
             counter += 1;
         }
     });
