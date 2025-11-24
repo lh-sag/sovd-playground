@@ -188,9 +188,6 @@ pub struct ReadValue {
     /// Errors if value represents an error condition
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub errors: Vec<DataError>,
-    /// Optional schema information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub schema: Option<serde_json::Value>,
 }
 
 // ============================================================================

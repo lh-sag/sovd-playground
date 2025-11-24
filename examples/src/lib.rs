@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use sovd_diagnostic::{
     Entity,
-    data::{DataCategory, DataCategoryInformation, DataError, DataService, DataValue, ValueGroup, ValueMetaData},
+    data::{DataCategory, DataCategoryInformation, DataError, DataService, ReadValue, ValueGroup, ValueMetaData},
 };
 
 pub fn init_logging() {
@@ -85,11 +85,11 @@ impl DataService for EngineData {
         Ok(vec![])
     }
 
-    async fn read(&self, _entity_id: &str, data_id: &str) -> Result<DataValue, DataError> {
+    async fn read(&self, _entity_id: &str, data_id: &str) -> Result<ReadValue, DataError> {
         if data_id == "rpm" {
-            Ok(DataValue {
+            Ok(ReadValue {
                 id: "rpm".to_string(),
-                value: json!(850),
+                data: json!(850),
                 errors: vec![],
             })
         } else {

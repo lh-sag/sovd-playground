@@ -6,8 +6,7 @@
 //! This module provides the bridging layer between sovd-diagnostic and
 //! sovd-models without creating direct dependencies between them.
 
-use sovd_diagnostic::{DataCategory, DataError, DataValue};
-use sovd_models::data::ReadValue;
+use sovd_diagnostic::{DataCategory, DataError};
 
 use crate::response::ApiError;
 
@@ -38,52 +37,5 @@ impl From<DataError> for ApiError {
             sovd_models::error::ErrorCode::SovdServerFailure => ApiError::server_failure(msg.clone()),
             _ => ApiError::not_found(msg.clone()),
         }
-    }
-}
-
-pub fn data_value_to_rest(value: DataValue, include_schema: bool) -> ReadValue {
-    ReadValue {
-        id: value.id.clone(),
-        data: value.value.clone(),
-        errors: value.errors,
-        schema: if include_schema {
-            Some(generate_schema_for_value(&value.id, &value.value))
-        } else {
-            None
-        },
-    }
-}
-
-fn generate_schema_for_value(_id: &str, value: &serde_json::Value) -> serde_json::Value {
-    use serde_json::json;
-
-    match value {
-        serde_json::Value::Bool(_) => json!({
-            "type": "boolean"
-        }),
-        serde_json::Value::Number(_) => json!({
-            "type": "number"
-        }),
-        serde_json::Value::String(_) => json!({
-            "type": "string"
-        }),
-        serde_json::Value::Array(arr) => {
-            if let Some(first) = arr.first() {
-                json!({
-                    "type": "array",
-                    "items": generate_schema_for_value("", first)
-                })
-            } else {
-                json!({
-                    "type": "array"
-                })
-            }
-        }
-        serde_json::Value::Object(_) => json!({
-            "type": "object"
-        }),
-        serde_json::Value::Null => json!({
-            "type": "null"
-        }),
     }
 }

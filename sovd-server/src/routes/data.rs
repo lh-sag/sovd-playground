@@ -10,7 +10,7 @@ use sovd_models::{
 };
 use tracing::debug;
 
-use crate::convert::{data_value_to_rest, parse_categories};
+use crate::convert::parse_categories;
 use crate::response::create_api_response;
 
 pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
@@ -67,11 +67,10 @@ pub(super) async fn get_data_value(
 
     let query = query.unwrap_or_else(|_| web::Query(DataResourceQuery::default()));
     let include_schema = query.include_schema;
-    let data_value = data_service
+    let response = data_service
         .read(&component_id, &data_id)
         .await
         .map_err(crate::response::ApiError::from)?;
-    let response = data_value_to_rest(data_value, include_schema);
 
     Ok(create_api_response(response, include_schema))
 }
