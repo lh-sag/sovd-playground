@@ -29,6 +29,7 @@ ui = [
 jsonschema-schemars = [
     "schemars/derive",
     "sovd-models/jsonschema-schemars",
+    "sovd-diagnostic/jsonschema-schemars",
 ]
 openssl = [
     "sovd-server/openssl",
