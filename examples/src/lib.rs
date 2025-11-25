@@ -20,18 +20,18 @@ pub fn init_logging() {
 }
 
 /// ECU component
-pub struct Ecu {
+pub struct Component {
     id: String,
     name: String,
 }
 
-impl Ecu {
+impl Component {
     pub fn new(id: String, name: String) -> Self {
         Self { id, name }
     }
 }
 
-impl Entity for Ecu {
+impl Entity for Component {
     fn id(&self) -> &str {
         &self.id
     }

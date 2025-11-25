@@ -4,7 +4,6 @@
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use derive_more::{Display, From};
-use serde::Serialize;
 use sovd_diagnostic::ServiceError;
 use sovd_models::{
     ApiResponse, JsonSchema,
@@ -12,17 +11,16 @@ use sovd_models::{
 };
 
 /// Vendor-specific error codes for the SOVD server.
-#[derive(Debug, Display, PartialEq, Serialize)]
-#[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, Display, PartialEq)]
 pub(crate) enum VendorError {
-    #[allow(dead_code)] // Used in tests via internal_error()
+    #[allow(dead_code)]
     InternalError,
     NotFound,
 }
 
 #[derive(Debug, Display, From)]
 #[display("{:?}: {}", self.0.error_code, self.0.message)]
-pub(crate) struct ApiError(pub GenericError<VendorError>);
+pub(crate) struct ApiError(pub GenericError);
 
 impl std::error::Error for ApiError {}
 
@@ -41,7 +39,7 @@ impl ApiError {
         ApiError(GenericError {
             error_code: ErrorCode::VendorSpecific,
             message: message.into(),
-            vendor_code: Some(vendor_error),
+            vendor_code: Some(vendor_error.to_string()),
             translation_id: None,
             parameters: None,
         })
@@ -152,9 +150,10 @@ impl ResponseError for ApiError {
             ErrorCode::VendorSpecific => {
                 // Check vendor code for more specific status
                 if let Some(ref vendor_code) = self.0.vendor_code {
-                    match vendor_code {
-                        VendorError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-                        VendorError::NotFound => StatusCode::NOT_FOUND,
+                    if vendor_code == &VendorError::NotFound.to_string() {
+                        StatusCode::NOT_FOUND
+                    } else {
+                        StatusCode::INTERNAL_SERVER_ERROR
                     }
                 } else {
                     StatusCode::INTERNAL_SERVER_ERROR
@@ -270,21 +269,21 @@ mod tests {
         let vendor_err = ApiError::vendor(VendorError::InternalError, "vendor");
         assert_eq!(vendor_err.0.error_code, ErrorCode::VendorSpecific);
         assert_eq!(vendor_err.0.message, "vendor");
-        assert_eq!(vendor_err.0.vendor_code, Some(VendorError::InternalError));
+        assert_eq!(vendor_err.0.vendor_code, Some(VendorError::InternalError.to_string()));
         assert!(vendor_err.0.translation_id.is_none());
         assert!(vendor_err.0.parameters.is_none());
 
         let internal = ApiError::internal_error("internal");
         assert_eq!(internal.0.error_code, ErrorCode::VendorSpecific);
         assert_eq!(internal.0.message, "internal");
-        assert_eq!(internal.0.vendor_code, Some(VendorError::InternalError));
+        assert_eq!(internal.0.vendor_code, Some(VendorError::InternalError.to_string()));
         assert!(internal.0.translation_id.is_none());
         assert!(internal.0.parameters.is_none());
 
         let not_found = ApiError::not_found("missing");
         assert_eq!(not_found.0.error_code, ErrorCode::VendorSpecific);
         assert_eq!(not_found.0.message, "missing");
-        assert_eq!(not_found.0.vendor_code, Some(VendorError::NotFound));
+        assert_eq!(not_found.0.vendor_code, Some(VendorError::NotFound.to_string()));
         assert!(not_found.0.translation_id.is_none());
         assert!(not_found.0.parameters.is_none());
 
