@@ -10,12 +10,6 @@ use crate::entities::{Entity, SovdServer};
 use crate::repository::EntityRepository;
 
 #[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
-pub enum BuilderError {
-    #[display("Entity with id '{}' already exists", _0)]
-    DuplicateEntity(#[error(ignore)] String),
-}
-
-#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
 pub enum ServiceError {
     #[display("Entity '{}' not found", entity_id)]
     EntityNotFound {
@@ -32,21 +26,14 @@ pub enum ServiceError {
     },
 }
 
+#[derive(Default)]
 pub struct ServiceRegistry {
     services: DashMap<(String, TypeId), Box<dyn Any + Send + Sync>>,
 }
 
-impl Default for ServiceRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ServiceRegistry {
     pub fn new() -> Self {
-        Self {
-            services: DashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn register<T: Send + Sync + 'static + ?Sized>(&self, entity_id: &str, service: Arc<T>)
@@ -73,19 +60,14 @@ impl ServiceRegistry {
     }
 }
 
+#[derive(Default)]
 pub struct EntityContext {
     services: Vec<(TypeId, Box<dyn Any + Send + Sync>)>,
 }
 
-impl Default for EntityContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl EntityContext {
     pub fn new() -> Self {
-        Self { services: Vec::new() }
+        Self::default()
     }
 
     pub fn with_service<T: Send + Sync + 'static + ?Sized>(mut self, service: Arc<T>) -> Self
@@ -137,8 +119,8 @@ impl DiagnosticBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Diagnostic, BuilderError> {
-        Ok(Diagnostic::new(self.repository, self.services))
+    pub fn build(self) -> Diagnostic {
+        Diagnostic::new(self.repository, self.services)
     }
 }
 
@@ -153,6 +135,7 @@ struct DiagnosticInner {
     services: ServiceRegistry,
 }
 
+#[derive(Clone)]
 pub struct Diagnostic {
     inner: Arc<DiagnosticInner>,
 }
@@ -196,13 +179,5 @@ impl Diagnostic {
         Arc<T>: Any + Send + Sync,
     {
         self.inner.services.get::<T>(entity_id).is_ok()
-    }
-}
-
-impl Clone for Diagnostic {
-    fn clone(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
     }
 }

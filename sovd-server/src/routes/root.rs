@@ -80,7 +80,7 @@ mod tests {
     #[actix_web::test]
     async fn test_list_capabilities_success() {
         let base_uri = crate::routes::BaseUri("http://localhost".to_string());
-        let diagnostic = Diagnostic::builder().build().unwrap();
+        let diagnostic = Diagnostic::builder().build();
 
         let app = test::init_service(app(base_uri, diagnostic)).await;
 
@@ -101,7 +101,7 @@ mod tests {
     #[actix_web::test]
     async fn test_list_capabilities_with_schema() {
         let base_uri = crate::routes::BaseUri("http://localhost".to_string());
-        let diagnostic = Diagnostic::builder().build().unwrap();
+        let diagnostic = Diagnostic::builder().build();
 
         let app = test::init_service(app(base_uri, diagnostic)).await;
 

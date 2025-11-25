@@ -17,7 +17,7 @@ use tokio::time::{Duration, interval};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     examples::init_logging();
 
-    let diagnostic = DiagnosticBuilder::new().build()?;
+    let diagnostic = DiagnosticBuilder::new().build();
     let diagnostic_clone = diagnostic.clone();
 
     let mut rx = diagnostic.entities().subscribe();
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Starting SOVD server on http://127.0.0.1:9000/sovd");
 
     let config = ServerConfig::builder()
-        .diagnostic(Arc::new(diagnostic))
+        .diagnostic(diagnostic)
         .endpoint(sovd_server::Listener::Tcp(listener), None, vec![], "/sovd".into())
         .build()?;
 

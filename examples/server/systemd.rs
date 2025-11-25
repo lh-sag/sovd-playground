@@ -24,7 +24,7 @@ mod systemd {
                 Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
                 |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
             )
-            .build()?;
+            .build();
 
         let fds: Vec<(i32, String)> = sd_notify::listen_fds_with_names(false)?.collect();
         if fds.is_empty() {
@@ -33,7 +33,7 @@ mod systemd {
 
         tracing::info!("Starting SOVD server with systemd socket activation");
 
-        let mut config_builder = ServerConfig::builder().diagnostic(Arc::new(diagnostic));
+        let mut config_builder = ServerConfig::builder().diagnostic(diagnostic);
 
         for (i, (fd, name)) in fds.iter().enumerate() {
             let base_path = if name.is_empty() {

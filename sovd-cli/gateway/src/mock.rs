@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::json;
-use sovd_diagnostic::{DataCategory, DiagnosticBuilder, ValueMetaData};
+use sovd_diagnostic::DiagnosticBuilder;
+use sovd_models::data::{DataCategory, ValueMetaData};
 
 use crate::components::{DataEntry, MockComponent, MockDataService};
 

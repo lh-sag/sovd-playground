@@ -26,7 +26,7 @@ mod unix {
                 Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
                 |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
             )
-            .build()?;
+            .build();
 
         // Start SOVD server on Unix domain sockets
         let socket_path = "/tmp/sovd.sock";
@@ -34,7 +34,7 @@ mod unix {
         let file_listener = UnixListener::bind(socket_path)?;
         tracing::info!("Starting SOVD server on Unix socket {}", socket_path);
 
-        let mut config = ServerConfig::builder().diagnostic(Arc::new(diagnostic)).endpoint(
+        let mut config = ServerConfig::builder().diagnostic(diagnostic).endpoint(
             sovd_server::Listener::Unix(file_listener),
             None,
             vec![],

@@ -22,8 +22,6 @@ env:
   RUST_BACKTRACE: 1
   PYTHON_VERSION: 3.13
   PRE_COMMIT_VERSION: 4.2
-  COV_VERSION: 0.6.15
-  RUST_VERSION: 1.91.1
   GIT_CLIFF_VERSION: 2.10.1
 
 jobs:
@@ -55,7 +53,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ inputs.rust_version || env.RUST_VERSION }}
+          toolchain: ${{ inputs.rust_version }}
           components: rustfmt, clippy
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -85,7 +83,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ inputs.rust_version || env.RUST_VERSION }}
+          toolchain: ${{ inputs.rust_version }}
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -123,7 +121,7 @@ jobs:
       actions: read
     with:
       run_id: ${{ github.run_id }}
-      rust_version: ${{ inputs.rust_version || '1.91.1' }}
+      rust_version: ${{ inputs.rust_version }}
 
   gate:
     name: CI Gate

@@ -5,7 +5,6 @@ use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::Parser;
 use futures_util::FutureExt;
@@ -88,7 +87,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // Build diagnostic with mock components
     let builder = sovd_diagnostic::DiagnosticBuilder::new();
     let builder = mock::create_mock_components(builder);
-    let diagnostic = builder.build()?;
+    let diagnostic = builder.build();
 
     // Create shared shutdown signal
     let shutdown_signal = async {
@@ -186,7 +185,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config_builder = ServerConfig::builder_with_vendor_type::<OpenSovdInfo>()
         .vendor_info(vendor_info)
-        .diagnostic(Arc::new(diagnostic));
+        .diagnostic(diagnostic);
 
     // Configure each server as an endpoint
     for server_cfg in &servers {
