@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright Liebherr-Digital Development Center GmbH
 // SPDX-License-Identifier: Apache-2.0
 
-use derive_more::{Display, Error};
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -195,12 +195,11 @@ pub struct ReadValue {
 // ============================================================================
 
 /// Error type for data operations
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, Error)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "jsonschema-schemars", derive(schemars::JsonSchema))]
-#[display("{}: {}", path, error.message)]
 pub struct DataError {
     pub path: String,
-    pub error: crate::error::GenericError<serde_json::Value>,
+    pub error: crate::error::GenericError,
 }
 
 /// Error codes for data operations
@@ -234,7 +233,7 @@ impl DataError {
             path: String::new(),
             error: crate::error::GenericError {
                 error_code: crate::error::ErrorCode::VendorSpecific,
-                vendor_code: Some(serde_json::json!("data-not-found")),
+                vendor_code: Some(DataErrorCode::DataNotFound.to_string()),
                 message: message.into(),
                 translation_id: None,
                 parameters: None,
@@ -405,7 +404,7 @@ mod tests {
         let error = DataError::not_found("Item not found");
 
         assert_eq!(error.error.error_code, crate::error::ErrorCode::VendorSpecific);
-        assert_eq!(error.error.vendor_code, Some(json!("data-not-found")));
+        assert_eq!(error.error.vendor_code, Some(DataErrorCode::DataNotFound.to_string()));
         assert_eq!(error.error.message, "Item not found");
         assert_eq!(error.path, "");
         assert!(error.error.parameters.is_none());
@@ -462,7 +461,7 @@ mod tests {
         let error = DataError::not_found("Item not found").with_path("/data/items/42");
 
         assert_eq!(error.path, "/data/items/42");
-        assert_eq!(error.error.vendor_code, Some(json!("data-not-found")));
+        assert_eq!(error.error.vendor_code, Some(DataErrorCode::DataNotFound.to_string()));
         assert_eq!(error.error.message, "Item not found");
     }
 
@@ -500,14 +499,6 @@ mod tests {
             error.error.parameters.as_ref().unwrap().get("retry_after"),
             Some(&json!(30))
         );
-    }
-
-    #[test]
-    fn test_display_implementation() {
-        let error = DataError::not_found("Component not found");
-        let display_str = format!("{error}");
-
-        assert!(display_str.contains("Component not found"));
     }
 
     #[test]
