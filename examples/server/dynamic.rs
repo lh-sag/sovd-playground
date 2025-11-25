@@ -8,7 +8,7 @@
 use std::net::TcpListener;
 use std::sync::Arc;
 
-use examples::Ecu;
+use examples::Component;
 use sovd_diagnostic::{DiagnosticBuilder, EntityEvent};
 use sovd_server::{Server, ServerConfig};
 use tokio::time::{Duration, interval};
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ticker.tick().await;
             let ecu_id = format!("ecu{counter}");
             let ecu_name = format!("ECU {counter}");
-            let ecu = Ecu::new(ecu_id, ecu_name);
+            let ecu = Component::new(ecu_id, ecu_name);
             diagnostic_clone.entities().add_entity(Arc::new(ecu));
             counter += 1;
         }

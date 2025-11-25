@@ -13,7 +13,7 @@ mod unix {
     use std::os::unix::net::UnixListener;
     use std::sync::Arc;
 
-    use examples::{Ecu, EngineData};
+    use examples::{Component, EngineData};
     use sovd_diagnostic::{DiagnosticBuilder, data::DataService};
     use sovd_server::{Server, ServerConfig};
 
@@ -23,7 +23,7 @@ mod unix {
 
         let diagnostic = DiagnosticBuilder::new()
             .with_entity(
-                Ecu::new("engine".to_string(), "Engine Control Unit".to_string()),
+                Component::new("engine".to_string(), "Engine Control Unit".to_string()),
                 |ctx| ctx.with_service(Arc::new(EngineData) as Arc<dyn DataService>),
             )
             .build();

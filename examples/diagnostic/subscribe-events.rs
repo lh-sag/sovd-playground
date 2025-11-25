@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use examples::Ecu;
+use examples::Component;
 use sovd_diagnostic::{DiagnosticBuilder, EntityEvent};
 
 #[tokio::main(flavor = "current_thread")]
@@ -35,11 +35,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     diagnostic
         .entities()
-        .add_entity(Arc::new(Ecu::new("engine".to_string(), "Engine ECU".to_string())));
+        .add_entity(Arc::new(Component::new("engine".to_string(), "Engine ECU".to_string())));
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    diagnostic.entities().add_entity(Arc::new(Ecu::new(
+    diagnostic.entities().add_entity(Arc::new(Component::new(
         "transmission".to_string(),
         "Transmission ECU".to_string(),
     )));
