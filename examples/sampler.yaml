@@ -1,0 +1,15 @@
+# Sampler dashboard for memory/cpu utilization
+
+variables:
+  sovd_base: http://127.0.0.1:9000/sovd/v1/components/system/data
+
+sparklines:
+  - title: CPU Usage %
+    rate-ms: 1000
+    scale: 2
+    sample: curl -s ${sovd_base}/cpu_usage | jq '.data'
+
+  - title: Memory Usage %
+    rate-ms: 1000
+    scale: 2
+    sample: curl -s ${sovd_base}/memory_usage | jq '.data'
