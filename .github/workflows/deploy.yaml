@@ -47,7 +47,15 @@ jobs:
           merge-multiple: true
 
       - name: Generate changelog
-        run: git-cliff --unreleased --output CHANGELOG.md
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [[ "$TAG" =~ ^v[0-9] ]]; then
+            # Version release: show changes for this tag
+            git-cliff --latest --output CHANGELOG.md
+          else
+            # Nightly/latest: show unreleased changes since last version
+            git-cliff --unreleased --output CHANGELOG.md
+          fi
 
       - name: Create or update release
         run: |
