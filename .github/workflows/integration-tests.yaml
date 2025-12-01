@@ -40,7 +40,7 @@ jobs:
         run: rustc -vV | grep host | awk '{print "triple=" $2}' >> $GITHUB_OUTPUT
         shell: bash
       - name: Download sovd-gateway binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: sovd-gateway-${{ steps.target.outputs.triple }}-${{ matrix.profile }}
           path: ./binaries
