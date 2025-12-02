@@ -13,18 +13,20 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/first-interaction@v2
+      - uses: actions/first-interaction@v3
+        if: contains(github.actor, '[bot]') == false
         with:
-          issue-message: |
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
             Hi @${{ github.event.issue.user.login }},
 
             Thanks for opening your first issue!
             We appreciate your contribution and will review it as soon as possible.
-          pr-message: |
+          pr_message: |
             Hi @${{ github.event.pull_request.user.login }},
 
             Thanks for your first pull request!
 
-            Please make sure you have run the pre-commit hooks as documented in CONTRIBUTING.md.
+            Please make sure you have run the pre-commit hooks as documented in [CONTRIBUTING.md](https://github.com/lh-sag/sovd-playground/blob/main/CONTRIBUTING.md).
 
             We appreciate your contribution and will review it as soon as possible.
